@@ -395,6 +395,89 @@ function localMkdir(state, args) {
   return ok('');
 }
 
+// ---------- Lab 3 toolchain ----------
+
+var CLASSPATH = '/opt/hadoop/etc/hadoop:/opt/hadoop/share/hadoop/common/lib/*:/opt/hadoop/share/hadoop/common/*:/opt/hadoop/share/hadoop/hdfs/*:/opt/hadoop/share/hadoop/mapreduce/*:/opt/hadoop/share/hadoop/yarn/*';
+
+var PART_R = '0,0\t19\n0,1\t22\n1,0\t43\n1,1\t50';
+
+function javac(state, args) {
+  var srcName = null;
+  for (var i = 0; i < args.length; i++) {
+    if (/\.java$/.test(args[i])) srcName = args[i];
+  }
+  if (!srcName) return err('javac: no source files');
+  var hasCp = args.indexOf('-classpath') !== -1 || args.indexOf('-cp') !== -1;
+  if (!hasCp) {
+    return err('MatrixMultiplication.java:3: error: package org.apache.hadoop.conf does not exist\n' +
+      '(hint: compile against Hadoop’s jars with  -classpath "$(hadoop classpath)")');
+  }
+  var segs = localSegs(state, srcName);
+  var node = getNode(state.local, segs);
+  if (!node || node.type !== 'file') return err('javac: file not found: ' + srcName);
+  var cwdNode = getNode(state.local, state.cwd);
+  cwdNode.children['MatrixMultiplication.class'] = file('<bytecode>');
+  cwdNode.children['MatrixMultiplication$MatMapper.class'] = file('<bytecode>');
+  cwdNode.children['MatrixMultiplication$MatReducer.class'] = file('<bytecode>');
+  state.compiled = true;
+  return ok('');
+}
+
+function jarTool(state, args) {
+  if (!args.length || args[0].indexOf('-c') !== 0) return err('jar: bad or missing flags (use: jar -cf MatrixMultiplication.jar *.class)');
+  if (!state.compiled) return err('jar: no .class files found — compile first with javac');
+  var jarName = null;
+  for (var i = 0; i < args.length; i++) {
+    if (/\.jar$/.test(args[i])) jarName = args[i];
+  }
+  if (!jarName) return err('jar: no output jar name given');
+  var cwdNode = getNode(state.local, state.cwd);
+  cwdNode.children[jarName.split('/').pop()] = file('<jar>');
+  state.jarBuilt = true;
+  var verbose = args[0].indexOf('v') !== -1;
+  return ok(verbose
+    ? 'added manifest\nadding: MatrixMultiplication.class\nadding: MatrixMultiplication$MatMapper.class\nadding: MatrixMultiplication$MatReducer.class'
+    : '');
+}
+
+function hadoopJar(state, args) {
+  if (args.length < 4) return err('Usage: hadoop jar <jar> <mainClass> <input> <output>');
+  var jarName = args[0], mainClass = args[1], inPath = args[2], outPath = args[3];
+  if (!state.clusterUp) return connRefused('mapreduce');
+  var jarNode = getNode(state.local, localSegs(state, jarName));
+  if (!jarNode || !state.jarBuilt) return err('Not a valid JAR: ' + jarName);
+  if (mainClass !== 'MatrixMultiplication') return err('java.lang.ClassNotFoundException: ' + mainClass);
+  var inSegs = hdfsSegs(inPath);
+  if (!getNode(state.hdfs, inSegs)) {
+    return err('org.apache.hadoop.mapreduce.lib.input.InvalidInputException: Input path does not exist: hdfs://localhost:9000' + hdfsPathStr(inSegs));
+  }
+  var outSegs = hdfsSegs(outPath);
+  if (getNode(state.hdfs, outSegs)) {
+    return err('org.apache.hadoop.mapred.FileAlreadyExistsException: Output directory hdfs://localhost:9000' + hdfsPathStr(outSegs) + ' already exists\n' +
+      '(hint: delete it first —  hdfs dfs -rm -r ' + hdfsPathStr(outSegs) + ')');
+  }
+  var parent = state.hdfs;
+  for (var i = 0; i < outSegs.length - 1; i++) {
+    if (!parent.children[outSegs[i]]) parent.children[outSegs[i]] = dir();
+    parent = parent.children[outSegs[i]];
+  }
+  parent.children[outSegs[outSegs.length - 1]] = dir({
+    '_SUCCESS': file(''),
+    'part-r-00000': file(PART_R)
+  });
+  state.jobRuns += 1;
+  var jobId = 'job_1784959837525_000' + state.jobRuns;
+  return ok([
+    'INFO client.DefaultNoHARMFailoverProxyProvider: Connecting to ResourceManager at /0.0.0.0:8032',
+    'INFO mapreduce.JobSubmitter: number of splits:1',
+    'INFO mapreduce.Job: Running job: ' + jobId,
+    'INFO mapreduce.Job:  map 0% reduce 0%',
+    'INFO mapreduce.Job:  map 100% reduce 0%',
+    'INFO mapreduce.Job:  map 100% reduce 100%',
+    'INFO mapreduce.Job: Job ' + jobId + ' completed successfully'
+  ].join('\n'));
+}
+
 // ---------- dispatch ----------
 
 function notFound(state, cmd) {
@@ -434,8 +517,13 @@ function runCommand(state, input) {
     if ((cmd === 'hadoop' && sub === 'fs') || (cmd === 'hdfs' && sub === 'dfs')) {
       return fsCmd(state, tokens.slice(2), cmd === 'hadoop' ? 'hadoop fs' : 'hdfs dfs');
     }
+    if (cmd === 'hadoop' && sub === 'classpath') return ok(CLASSPATH);
+    if (cmd === 'hadoop' && sub === 'jar') return hadoopJar(state, tokens.slice(2));
     return err(cmd + ' ' + (sub || '') + ': unknown subcommand (try: ' + (cmd === 'hadoop' ? 'hadoop fs -…' : 'hdfs dfs -…') + ')');
   }
+
+  if (cmd === 'javac') return javac(state, tokens.slice(1));
+  if (cmd === 'jar') return jarTool(state, tokens.slice(1));
 
   if (cmd === 'ls') return localLs(state);
   if (cmd === 'cd') return localCd(state, tokens[1]);

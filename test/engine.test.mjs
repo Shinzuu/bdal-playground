@@ -247,3 +247,85 @@ test('WARN line present on successful fs output', () => {
   const s = up('linux');
   assert.ok(runCommand(s, 'hadoop fs -ls /').output.includes('WARN util.NativeCodeLoader'));
 });
+
+// ---------- Task 3: Lab 3 toolchain ----------
+
+test('hadoop classpath returns a classpath string', () => {
+  const s = createState('linux');
+  assert.ok(runCommand(s, 'hadoop classpath').output.includes('hadoop'));
+});
+
+test('full Lab 3 happy path (linux)', () => {
+  const s = createState('linux');
+  runCommand(s, 'hadoop-start');
+  runCommand(s, 'cd ~/mat');
+  const seq = [
+    'hdfs dfs -mkdir -p /bda2',
+    'hdfs dfs -copyFromLocal -f matrix.txt /bda2',
+    'hdfs dfs -ls /bda2',
+    'javac -classpath "$(hadoop classpath)" -d . MatrixMultiplication.java',
+    'jar -cf MatrixMultiplication.jar MatrixMultiplication.class',
+    'hadoop jar MatrixMultiplication.jar MatrixMultiplication /bda2/matrix.txt /matrixoutput'
+  ];
+  for (const c of seq) {
+    const r = runCommand(s, c);
+    assert.equal(r.ok, true, c + ' => ' + r.output);
+  }
+  const job = runCommand(s, 'hdfs dfs -cat /matrixoutput/part-r-00000');
+  assert.ok(job.output.includes('19'), job.output);
+  assert.ok(job.output.includes('22'));
+  assert.ok(job.output.includes('43'));
+  assert.ok(job.output.includes('50'));
+});
+
+test('full Lab 3 happy path (windows forms)', () => {
+  const s = createState('windows');
+  runCommand(s, 'start-all.cmd');
+  const seq = [
+    'hdfs dfs -mkdir /bda2',
+    'hdfs dfs -copyFromLocal C:/BDA/matrix.txt /bda2',
+    'javac -classpath "%HADOOP_HOME%\\share\\hadoop\\common\\*" -d . MatrixMultiplication.java',
+    'jar -cvf MatrixMultiplication.jar -C . .',
+    'hadoop jar MatrixMultiplication.jar MatrixMultiplication /bda2/matrix.txt /matrixoutput',
+    'hdfs dfs -cat /matrixoutput/part-r-00000'
+  ];
+  for (const c of seq) {
+    const r = runCommand(s, c);
+    assert.equal(r.ok, true, c + ' => ' + r.output);
+  }
+});
+
+test('job errors: output exists, jar before javac, missing input, cluster down', () => {
+  const s = createState('linux');
+  // jar before javac
+  runCommand(s, 'cd ~/mat');
+  const j = runCommand(s, 'jar -cf MatrixMultiplication.jar MatrixMultiplication.class');
+  assert.equal(j.ok, false);
+  // cluster down
+  const down = runCommand(s, 'hadoop jar MatrixMultiplication.jar MatrixMultiplication /bda2/matrix.txt /matrixoutput');
+  assert.equal(down.ok, false);
+  runCommand(s, 'hadoop-start');
+  runCommand(s, 'javac -classpath "$(hadoop classpath)" -d . MatrixMultiplication.java');
+  runCommand(s, 'jar -cf MatrixMultiplication.jar MatrixMultiplication.class');
+  // missing input
+  const mi = runCommand(s, 'hadoop jar MatrixMultiplication.jar MatrixMultiplication /bda2/matrix.txt /matrixoutput');
+  assert.equal(mi.ok, false);
+  assert.ok(mi.output.includes('Input path does not exist'), mi.output);
+  runCommand(s, 'hdfs dfs -mkdir /bda2');
+  runCommand(s, 'hdfs dfs -copyFromLocal matrix.txt /bda2');
+  assert.equal(runCommand(s, 'hadoop jar MatrixMultiplication.jar MatrixMultiplication /bda2/matrix.txt /matrixoutput').ok, true);
+  // output exists now
+  const oe = runCommand(s, 'hadoop jar MatrixMultiplication.jar MatrixMultiplication /bda2/matrix.txt /matrixoutput');
+  assert.equal(oe.ok, false);
+  assert.ok(oe.output.includes('FileAlreadyExistsException'), oe.output);
+  // delete and re-run works
+  runCommand(s, 'hdfs dfs -rm -r -skipTrash /matrixoutput');
+  assert.equal(runCommand(s, 'hadoop jar MatrixMultiplication.jar MatrixMultiplication /bda2/matrix.txt /matrixoutput').ok, true);
+});
+
+test('javac without source file in cwd fails', () => {
+  const s = createState('linux');
+  const r = runCommand(s, 'javac -classpath "$(hadoop classpath)" -d . MatrixMultiplication.java');
+  assert.equal(r.ok, false);
+  assert.ok(r.output.includes('file not found'));
+});
