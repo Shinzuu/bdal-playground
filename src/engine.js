@@ -191,11 +191,152 @@ function fsCmd(state, args, family) {
     var known = ['-ls', '-mkdir', '-copyFromLocal', '-put', '-copyToLocal', '-get', '-cat', '-rm', '-rmdir'];
     if (known.indexOf(sub) !== -1) return connRefused(verb);
   }
+  var rest = args.slice(1);
   switch (sub) {
-    case '-ls': return fsLs(state, args.slice(1));
+    case '-ls': return fsLs(state, rest);
+    case '-mkdir': return fsMkdir(state, rest);
+    case '-copyFromLocal':
+    case '-put': return fsPut(state, rest, verb);
+    case '-copyToLocal':
+    case '-get': return fsGet(state, rest, verb);
+    case '-cat': return fsCat(state, rest);
+    case '-rm': return fsRm(state, rest);
+    case '-rmdir': return fsRmdir(state, rest);
     default:
       return err(sub + ': Unknown command');
   }
+}
+
+function flagsAndPaths(rest) {
+  var flags = [], paths = [];
+  for (var i = 0; i < rest.length; i++) {
+    if (rest[i].indexOf('-') === 0 && !/^-?\/|^-?[A-Za-z]:/.test(rest[i])) flags.push(rest[i]);
+    else paths.push(rest[i]);
+  }
+  return { flags: flags, paths: paths };
+}
+
+function fsMkdir(state, rest) {
+  var fp = flagsAndPaths(rest);
+  if (!fp.paths.length) return err('-mkdir: Not enough arguments');
+  var withP = fp.flags.indexOf('-p') !== -1;
+  for (var i = 0; i < fp.paths.length; i++) {
+    var segs = hdfsSegs(fp.paths[i]);
+    var shown = hdfsPathStr(segs);
+    if (getNode(state.hdfs, segs)) return err('mkdir: `' + shown + "': File exists");
+    var parent = getNode(state.hdfs, segs.slice(0, -1));
+    if (!parent || parent.type !== 'dir') {
+      if (!withP) return err('mkdir: `' + shown + "': No such file or directory");
+      parent = state.hdfs;
+      for (var j = 0; j < segs.length - 1; j++) {
+        if (!parent.children[segs[j]]) parent.children[segs[j]] = dir();
+        parent = parent.children[segs[j]];
+      }
+    }
+    parent.children[segs[segs.length - 1]] = dir();
+  }
+  return ok(WARN);
+}
+
+function fsPut(state, rest, verb) {
+  var fp = flagsAndPaths(rest);
+  var force = fp.flags.indexOf('-f') !== -1;
+  if (fp.paths.length < 2) return err('-' + verb + ': Not enough arguments');
+  var srcPath = fp.paths[0], dstPath = fp.paths[1];
+  if (/\s/.test(srcPath)) return err(verb + ': unexpected URISyntaxException');
+  var srcSegs = localSegs(state, srcPath);
+  var srcNode = getNode(state.local, srcSegs);
+  if (!srcNode || srcNode.type !== 'file') {
+    return err(verb + ": `" + srcPath + "': No such file or directory");
+  }
+  var name = srcSegs[srcSegs.length - 1];
+  var dstSegs = hdfsSegs(dstPath);
+  var dstNode = getNode(state.hdfs, dstSegs);
+  var parent, finalName;
+  if (dstNode && dstNode.type === 'dir') { parent = dstNode; finalName = name; }
+  else if (dstNode && dstNode.type === 'file') {
+    if (!force) return err(verb + ': `' + hdfsPathStr(dstSegs) + "': File exists");
+    parent = getNode(state.hdfs, dstSegs.slice(0, -1)); finalName = dstSegs[dstSegs.length - 1];
+  } else {
+    parent = getNode(state.hdfs, dstSegs.slice(0, -1));
+    if (!parent || parent.type !== 'dir') return err(verb + ': `' + hdfsPathStr(dstSegs) + "': No such file or directory");
+    finalName = dstSegs[dstSegs.length - 1];
+  }
+  if (parent.children[finalName] && !force) {
+    return err(verb + ': `' + hdfsPathStr(dstSegs) + '/' + finalName + "': File exists");
+  }
+  parent.children[finalName] = file(srcNode.content);
+  return ok(WARN);
+}
+
+function fsGet(state, rest, verb) {
+  var fp = flagsAndPaths(rest);
+  if (fp.paths.length < 2) return err('-' + verb + ': Not enough arguments');
+  var srcSegs = hdfsSegs(fp.paths[0]);
+  var srcNode = getNode(state.hdfs, srcSegs);
+  var errVerb = verb === 'copyToLocal' ? 'copyToLocal' : 'get';
+  if (!srcNode || srcNode.type !== 'file') {
+    return err(errVerb + ': `' + hdfsPathStr(srcSegs) + "': No such file or directory");
+  }
+  var name = srcSegs[srcSegs.length - 1];
+  var dstPath = fp.paths[1];
+  var dstSegs = localSegs(state, dstPath === '.' ? '.' : dstPath);
+  var dstNode = getNode(state.local, dstSegs);
+  var parent, finalName;
+  if (dstNode && dstNode.type === 'dir') { parent = dstNode; finalName = name; }
+  else {
+    parent = getNode(state.local, dstSegs.slice(0, -1));
+    if (!parent || parent.type !== 'dir') return err(errVerb + ': `' + dstPath + "': No such file or directory");
+    finalName = dstSegs[dstSegs.length - 1];
+  }
+  parent.children[finalName] = file(srcNode.content);
+  return ok(WARN);
+}
+
+function fsCat(state, rest) {
+  var fp = flagsAndPaths(rest);
+  if (!fp.paths.length) return err('-cat: Not enough arguments');
+  var out = [WARN];
+  for (var i = 0; i < fp.paths.length; i++) {
+    var segs = hdfsSegs(fp.paths[i]);
+    var node = getNode(state.hdfs, segs);
+    if (!node) return err('cat: `' + hdfsPathStr(segs) + "': No such file or directory");
+    if (node.type === 'dir') return err('cat: `' + hdfsPathStr(segs) + "': Is a directory");
+    out.push(node.content);
+  }
+  return ok(out.join('\n'));
+}
+
+function fsRm(state, rest) {
+  var fp = flagsAndPaths(rest);
+  var recursive = fp.flags.indexOf('-r') !== -1 || fp.flags.indexOf('-R') !== -1;
+  if (!fp.paths.length) return err('-rm: Not enough arguments');
+  var out = [WARN];
+  for (var i = 0; i < fp.paths.length; i++) {
+    var segs = hdfsSegs(fp.paths[i]);
+    var shown = hdfsPathStr(segs);
+    var node = getNode(state.hdfs, segs);
+    if (!node) return err('rm: `' + shown + "': No such file or directory");
+    if (node.type === 'dir' && !recursive) return err('rm: `' + shown + "': Is a directory");
+    var parent = getNode(state.hdfs, segs.slice(0, -1));
+    delete parent.children[segs[segs.length - 1]];
+    out.push('Deleted ' + shown);
+  }
+  return ok(out.join('\n'));
+}
+
+function fsRmdir(state, rest) {
+  var fp = flagsAndPaths(rest);
+  if (!fp.paths.length) return err('-rmdir: Not enough arguments');
+  var segs = hdfsSegs(fp.paths[0]);
+  var shown = hdfsPathStr(segs);
+  var node = getNode(state.hdfs, segs);
+  if (!node) return err('rmdir: `' + shown + "': No such file or directory");
+  if (node.type !== 'dir') return err('rmdir: `' + shown + "': Is not a directory");
+  if (Object.keys(node.children).length) return err('rmdir: `' + shown + "': Directory is not empty");
+  var parent = getNode(state.hdfs, segs.slice(0, -1));
+  delete parent.children[segs[segs.length - 1]];
+  return ok(WARN);
 }
 
 function fsLs(state, rest) {
