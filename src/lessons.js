@@ -313,8 +313,114 @@ var MODULES = [
       stepRunJob('/bda2/matrix.txt', '/matrixoutput'),
       stepReadResult('/matrixoutput')
     ]
+  },
+  {
+    id: 'm4',
+    title: 'Extended toolbox',
+    subtitle: 'cp · mv · touchz · count · du · tail · dfsadmin — the “extra” questions',
+    setup: function (engine, os) {
+      var s = engine.createState(os);
+      engine.runCommand(s, os === 'windows' ? 'start-all.cmd' : 'hadoop-start');
+      return s;
+    },
+    steps: [
+      stepMkdir('/work', 'A scratch directory for this round — more mkdir reps never hurt.'),
+      stepCd(kitCd, 'Back to the sample files on local disk.'),
+      stepPut('command3.txt', '/work', { theory: 'One more put — by now this should be automatic.' }),
+      stepCp('/work/command3.txt', '/work/copy.txt'),
+      stepMv('/work/copy.txt', '/work/notes.txt'),
+      stepTouchz('/work/empty.txt'),
+      stepCount('/work'),
+      stepDu('/work'),
+      stepTail('/work/command3.txt', 'this file moves into hdfs'),
+      stepReport(),
+      stepVersion(),
+      stepRmR('/work', 'Always leave the cluster the way you found it — recursive cleanup.')
+    ]
   }
 ];
+
+// ---------- module 4: extended toolbox ----------
+
+function stepCp(src, dst) {
+  return {
+    theory: '-cp copies a file INSIDE HDFS — no local disk involved. Source first, destination second.',
+    question: 'Copy ' + src + ' to ' + dst + ' (both in HDFS).',
+    hints: ['Same shape as Unix cp, as an fs subcommand.', 'Shape: hadoop fs -cp ' + src + ' ' + dst],
+    answer: function () { return 'hadoop fs -cp ' + src + ' ' + dst; },
+    check: function (state) { return !!hnode(state, dst) && !!hnode(state, src); }
+  };
+}
+
+function stepMv(src, dst) {
+  return {
+    theory: '-mv moves OR renames inside HDFS — it is the same command for both, exactly like Unix mv.',
+    question: 'Rename ' + src + ' to ' + dst + '.',
+    hints: ['Move and rename are one command.', 'Shape: hadoop fs -mv ' + src + ' ' + dst],
+    answer: function () { return 'hadoop fs -mv ' + src + ' ' + dst; },
+    check: function (state) { return !!hnode(state, dst) && !hnode(state, src); }
+  };
+}
+
+function stepTouchz(path) {
+  return {
+    theory: '-touchz creates an empty (zero-byte) file — handy for markers and quick tests.',
+    question: 'Create an empty file at ' + path + '.',
+    hints: ['Like Unix touch, with a z.', 'Shape: hadoop fs -touchz ' + path],
+    answer: function () { return 'hadoop fs -touchz ' + path; },
+    check: function (state) { var n = hnode(state, path); return !!n && n.type === 'file'; }
+  };
+}
+
+function stepCount(path) {
+  return {
+    theory: '-count summarises a directory in one line: DIR_COUNT, FILE_COUNT, total bytes, path.',
+    question: 'Count the directories, files and bytes under ' + path + '.',
+    hints: ['One fs subcommand, one path.', 'Shape: hadoop fs -count ' + path],
+    answer: function () { return 'hadoop fs -count ' + path; },
+    check: function (state, result, input) { return result.ok && input.indexOf('-count') !== -1; }
+  };
+}
+
+function stepDu(path) {
+  return {
+    theory: '-du shows per-entry disk usage; add -h for human-readable sizes (K, M, G).',
+    question: 'Show the human-readable size of everything in ' + path + '.',
+    hints: ['du plus the human flag plus the path.', 'Shape: hadoop fs -du -h ' + path],
+    answer: function () { return 'hadoop fs -du -h ' + path; },
+    check: function (state, result, input) { return result.ok && input.indexOf('-du') !== -1; }
+  };
+}
+
+function stepTail(path, fragment) {
+  return {
+    theory: 'Job outputs can be huge — -tail prints only the last kilobyte, so you can peek without flooding the screen.',
+    question: 'Show the tail end of ' + path + '.',
+    hints: ['Like Unix tail.', 'Shape: hadoop fs -tail ' + path],
+    answer: function () { return 'hadoop fs -tail ' + path; },
+    check: function (state, result, input) { return result.ok && input.indexOf('-tail') !== -1 && result.output.indexOf(fragment) !== -1; }
+  };
+}
+
+function stepReport() {
+  return {
+    theory: 'hdfs dfsadmin -report is the admin health check: capacity, usage, and every live DataNode. If the lab examiner asks “is your cluster healthy?”, this is the answer.',
+    question: 'Print the cluster health report.',
+    hints: ['It is a dfsadmin subcommand, not fs.', 'Shape: hdfs dfsadmin -report'],
+    answer: function () { return 'hdfs dfsadmin -report'; },
+    check: function (state, result, input) { return result.ok && input.indexOf('dfsadmin') !== -1 && input.indexOf('-report') !== -1; }
+  };
+}
+
+function stepVersion() {
+  return {
+    theory: 'Know your version: Hadoop 3.x uses web UI port 9870 — old manuals say 50070, which is 2.x. Version mismatches are the #1 source of “why doesn’t my machine match the manual”.',
+    question: 'Print which Hadoop version you are running.',
+    hints: ['Plain hadoop subcommand, no dash.', 'Shape: hadoop version'],
+    answer: function () { return 'hadoop version'; },
+    check: function (state, result, input) { return result.ok && /^hadoop\s+version$/.test(input.trim()); }
+  };
+}
 
 // ---------- recap rounds (same command families, fresh paths, no theory) ----------
 
@@ -343,6 +449,21 @@ function buildRecap(module) {
       stepRmFile('/college/notes/exampleput.txt'),
       stepRmdir('/college/notes'),
       stepRmR('/college')
+    ];
+  } else if (module.id === 'm4') {
+    steps = [
+      stepMkdir('/extra'),
+      stepCd(kitCd),
+      stepPut('exampleput.txt', '/extra', { useAlias: true }),
+      stepCp('/extra/exampleput.txt', '/extra/twin.txt'),
+      stepMv('/extra/twin.txt', '/extra/final.txt'),
+      stepTouchz('/extra/marker.txt'),
+      stepCount('/extra'),
+      stepDu('/extra'),
+      stepTail('/extra/exampleput.txt', 'uploaded with put'),
+      stepReport(),
+      stepVersion(),
+      stepRmR('/extra')
     ];
   } else {
     steps = [

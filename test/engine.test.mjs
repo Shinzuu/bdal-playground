@@ -329,3 +329,63 @@ test('javac without source file in cwd fails', () => {
   assert.equal(r.ok, false);
   assert.ok(r.output.includes('file not found'));
 });
+
+// ---------- Extended command set (module 4) ----------
+
+test('cp and mv inside HDFS', () => {
+  const s = createState('linux');
+  runCommand(s, 'hadoop-start');
+  runCommand(s, 'hadoop fs -mkdir /work');
+  runCommand(s, 'cd ~/kit/Lab-2-HDFS-Basic-Commands');
+  runCommand(s, 'hadoop fs -put command3.txt /work');
+  const cp = runCommand(s, 'hadoop fs -cp /work/command3.txt /work/copy.txt');
+  assert.equal(cp.ok, true, cp.output);
+  assert.ok(runCommand(s, 'hadoop fs -ls /work').output.includes('copy.txt'));
+  assert.ok(runCommand(s, 'hadoop fs -ls /work').output.includes('command3.txt'));
+  const mv = runCommand(s, 'hadoop fs -mv /work/copy.txt /work/notes.txt');
+  assert.equal(mv.ok, true, mv.output);
+  const ls = runCommand(s, 'hadoop fs -ls /work').output;
+  assert.ok(ls.includes('notes.txt'));
+  assert.ok(!ls.includes('copy.txt'));
+  // errors
+  assert.equal(runCommand(s, 'hadoop fs -mv /work/nope.txt /x').ok, false);
+  assert.equal(runCommand(s, 'hadoop fs -cp /work/nope.txt /x').ok, false);
+});
+
+test('touchz, count, du, tail', () => {
+  const s = createState('linux');
+  runCommand(s, 'hadoop-start');
+  runCommand(s, 'hadoop fs -mkdir /work');
+  runCommand(s, 'cd ~/kit/Lab-2-HDFS-Basic-Commands');
+  runCommand(s, 'hadoop fs -put command3.txt /work');
+  const tz = runCommand(s, 'hadoop fs -touchz /work/empty.txt');
+  assert.equal(tz.ok, true, tz.output);
+  const lsout = runCommand(s, 'hadoop fs -ls /work').output;
+  assert.ok(lsout.includes('empty.txt'));
+  const cnt = runCommand(s, 'hadoop fs -count /work');
+  assert.equal(cnt.ok, true);
+  assert.ok(/1\s+2\s+\d+\s+\/work/.test(cnt.output), cnt.output);
+  const du = runCommand(s, 'hadoop fs -du -h /work');
+  assert.equal(du.ok, true);
+  assert.ok(du.output.includes('/work/command3.txt'));
+  const tail = runCommand(s, 'hadoop fs -tail /work/command3.txt');
+  assert.equal(tail.ok, true);
+  assert.ok(tail.output.includes('this file moves into hdfs'));
+  assert.equal(runCommand(s, 'hadoop fs -tail /work').ok, false);
+});
+
+test('dfsadmin -report and hadoop version', () => {
+  const s = createState('linux');
+  const down = runCommand(s, 'hdfs dfsadmin -report');
+  assert.equal(down.ok, false);
+  assert.ok(down.output.includes('Connection refused'));
+  runCommand(s, 'hadoop-start');
+  const rep = runCommand(s, 'hdfs dfsadmin -report');
+  assert.equal(rep.ok, true);
+  assert.ok(rep.output.includes('Live datanodes (1)'));
+  const v = runCommand(s, 'hadoop version');
+  assert.equal(v.ok, true);
+  assert.ok(v.output.includes('Hadoop 3.4.1'));
+  const w = createState('windows');
+  assert.ok(runCommand(w, 'hadoop version').output.includes('Hadoop 3.3.6'));
+});

@@ -188,7 +188,8 @@ function fsCmd(state, args, family) {
   var sub = args[0];
   var verb = sub.replace(/^-+/, '');
   if (!state.clusterUp) {
-    var known = ['-ls', '-mkdir', '-copyFromLocal', '-put', '-copyToLocal', '-get', '-cat', '-rm', '-rmdir'];
+    var known = ['-ls', '-mkdir', '-copyFromLocal', '-put', '-copyToLocal', '-get', '-cat', '-rm', '-rmdir',
+      '-mv', '-cp', '-du', '-tail', '-touchz', '-count'];
     if (known.indexOf(sub) !== -1) return connRefused(verb);
   }
   var rest = args.slice(1);
@@ -202,9 +203,119 @@ function fsCmd(state, args, family) {
     case '-cat': return fsCat(state, rest);
     case '-rm': return fsRm(state, rest);
     case '-rmdir': return fsRmdir(state, rest);
+    case '-mv':
+    case '-cp': return fsMvCp(state, rest, verb);
+    case '-du': return fsDu(state, rest);
+    case '-tail': return fsTail(state, rest);
+    case '-touchz': return fsTouchz(state, rest);
+    case '-count': return fsCount(state, rest);
     default:
       return err(sub + ': Unknown command');
   }
+}
+
+function cloneNode(node) { return JSON.parse(JSON.stringify(node)); }
+
+function fsMvCp(state, rest, verb) {
+  var fp = flagsAndPaths(rest);
+  if (fp.paths.length < 2) return err('-' + verb + ': Not enough arguments');
+  var srcSegs = hdfsSegs(fp.paths[0]);
+  var srcNode = getNode(state.hdfs, srcSegs);
+  if (!srcNode) return err(verb + ': `' + hdfsPathStr(srcSegs) + "': No such file or directory");
+  var dstSegs = hdfsSegs(fp.paths[1]);
+  var dstNode = getNode(state.hdfs, dstSegs);
+  var parent, finalName;
+  if (dstNode && dstNode.type === 'dir') { parent = dstNode; finalName = srcSegs[srcSegs.length - 1]; }
+  else if (dstNode) { return err(verb + ': `' + hdfsPathStr(dstSegs) + "': File exists"); }
+  else {
+    parent = getNode(state.hdfs, dstSegs.slice(0, -1));
+    if (!parent || parent.type !== 'dir') return err(verb + ': `' + hdfsPathStr(dstSegs) + "': No such file or directory");
+    finalName = dstSegs[dstSegs.length - 1];
+  }
+  parent.children[finalName] = cloneNode(srcNode);
+  if (verb === 'mv') {
+    var srcParent = getNode(state.hdfs, srcSegs.slice(0, -1));
+    delete srcParent.children[srcSegs[srcSegs.length - 1]];
+  }
+  return ok(WARN);
+}
+
+function sumSize(node) {
+  if (node.type === 'file') return node.content.length;
+  var total = 0;
+  for (var k in node.children) total += sumSize(node.children[k]);
+  return total;
+}
+
+function humanSize(n) {
+  if (n < 1024) return String(n);
+  return (n / 1024).toFixed(1) + ' K';
+}
+
+function fsDu(state, rest) {
+  var fp = flagsAndPaths(rest);
+  var human = fp.flags.indexOf('-h') !== -1;
+  var p = fp.paths[0] || '/user/student';
+  var segs = hdfsSegs(p);
+  var node = getNode(state.hdfs, segs);
+  if (!node) return err('du: `' + hdfsPathStr(segs) + "': No such file or directory");
+  var out = [WARN];
+  var entries = node.type === 'dir' ? Object.keys(node.children).sort() : [null];
+  for (var i = 0; i < entries.length; i++) {
+    var child = entries[i] === null ? node : node.children[entries[i]];
+    var full = entries[i] === null ? hdfsPathStr(segs) : hdfsPathStr(segs) + '/' + entries[i];
+    var size = sumSize(child);
+    var shown = human ? humanSize(size) : String(size);
+    out.push(shown + '  ' + shown + '  ' + full);
+  }
+  return ok(out.join('\n'));
+}
+
+function fsTail(state, rest) {
+  var fp = flagsAndPaths(rest);
+  if (!fp.paths.length) return err('-tail: Not enough arguments');
+  var segs = hdfsSegs(fp.paths[0]);
+  var node = getNode(state.hdfs, segs);
+  if (!node) return err('tail: `' + hdfsPathStr(segs) + "': No such file or directory");
+  if (node.type === 'dir') return err('tail: `' + hdfsPathStr(segs) + "': Is a directory");
+  var content = node.content;
+  var tail = content.length > 1024 ? content.slice(content.length - 1024) : content;
+  return ok(WARN + '\n' + tail);
+}
+
+function fsTouchz(state, rest) {
+  var fp = flagsAndPaths(rest);
+  if (!fp.paths.length) return err('-touchz: Not enough arguments');
+  var segs = hdfsSegs(fp.paths[0]);
+  var existing = getNode(state.hdfs, segs);
+  if (existing && existing.type === 'dir') return err('touchz: `' + hdfsPathStr(segs) + "': Is a directory");
+  var parent = getNode(state.hdfs, segs.slice(0, -1));
+  if (!parent || parent.type !== 'dir') return err('touchz: `' + hdfsPathStr(segs) + "': No such file or directory");
+  parent.children[segs[segs.length - 1]] = file('');
+  return ok(WARN);
+}
+
+function countDirs(node) {
+  if (node.type !== 'dir') return 0;
+  var n = 1;
+  for (var k in node.children) n += countDirs(node.children[k]);
+  return n;
+}
+function countFiles(node) {
+  if (node.type === 'file') return 1;
+  var n = 0;
+  for (var k in node.children) n += countFiles(node.children[k]);
+  return n;
+}
+
+function fsCount(state, rest) {
+  var fp = flagsAndPaths(rest);
+  var p = fp.paths[0] || '/user/student';
+  var segs = hdfsSegs(p);
+  var node = getNode(state.hdfs, segs);
+  if (!node) return err('count: `' + hdfsPathStr(segs) + "': No such file or directory");
+  return ok(WARN + '\n' +
+    '           ' + countDirs(node) + '            ' + countFiles(node) + '                 ' + sumSize(node) + ' ' + hdfsPathStr(segs));
 }
 
 function flagsAndPaths(rest) {
@@ -519,6 +630,29 @@ function runCommand(state, input) {
     }
     if (cmd === 'hadoop' && sub === 'classpath') return ok(CLASSPATH);
     if (cmd === 'hadoop' && sub === 'jar') return hadoopJar(state, tokens.slice(2));
+    if (cmd === 'hadoop' && sub === 'version') {
+      var ver = state.os === 'windows' ? '3.3.6' : '3.4.1';
+      return ok('Hadoop ' + ver + '\nSource code repository https://github.com/apache/hadoop.git\nCompiled with protoc\nThis command was run using /opt/hadoop/share/hadoop/common/hadoop-common-' + ver + '.jar');
+    }
+    if (cmd === 'hdfs' && sub === 'dfsadmin') {
+      if (tokens[2] !== '-report') return err('dfsadmin: unknown option ' + (tokens[2] || '') + ' (try: hdfs dfsadmin -report)');
+      if (!state.clusterUp) return connRefused('report');
+      var used = 4096 + JSON.stringify(state.hdfs).length;
+      return ok([
+        'Configured Capacity: 250790436864 (233.57 GB)',
+        'Present Capacity: 198654312448 (185.01 GB)',
+        'DFS Remaining: 198654308352 (185.01 GB)',
+        'DFS Used: ' + used + ' (' + (used / 1024).toFixed(1) + ' KB)',
+        'DFS Used%: 0.00%',
+        'Live datanodes (1):',
+        '',
+        'Name: 127.0.0.1:9866 (localhost)',
+        'Hostname: localhost',
+        'Decommission Status : Normal',
+        'DFS Used: ' + used,
+        'Last contact: just now'
+      ].join('\n'));
+    }
     return err(cmd + ' ' + (sub || '') + ': unknown subcommand (try: ' + (cmd === 'hadoop' ? 'hadoop fs -…' : 'hdfs dfs -…') + ')');
   }
 

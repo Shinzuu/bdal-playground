@@ -1,0 +1,1736 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BDAL Lab Playground — Hadoop command trainer</title>
+<meta name="description" content="Type-to-learn trainer for the BDAL Hadoop labs: cluster startup, HDFS commands (Lab 2) and MapReduce matrix multiplication (Lab 3), in a simulated terminal. Pick your OS and drill the real commands.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23F2B705'/%3E%3Ctext x='6' y='23' font-family='monospace' font-size='18' font-weight='bold' fill='%2320262E'%3E%24_%3C/text%3E%3C/svg%3E">
+<style>
+:root {
+  --paper: #F7F5F0;
+  --card: #FFFFFF;
+  --ink: #20262E;
+  --muted: #6A7280;
+  --line: #E3DFD5;
+  --accent: #F2B705;
+  --accent-soft: #FCF3D2;
+  --accent-ink: #7A5D00;
+  --term-bg: #14181D;
+  --term-line: #232A33;
+  --term-out: #D7DEE8;
+  --term-dim: #8A94A3;
+  --ok: #2FA36B;
+  --ok-soft: #E2F3EA;
+  --err: #E05252;
+  --err-soft: #FBE9E9;
+  --mono: ui-monospace, "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app { max-width: 760px; margin: 0 auto; padding: 0 16px 48px; }
+
+h1, h2, h3, .display {
+  font-family: var(--mono);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+a { color: var(--accent-ink); }
+
+/* ---------- header ---------- */
+.top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 0 10px; border-bottom: 2px solid var(--ink);
+  margin-bottom: 20px;
+}
+.top .brand { font-family: var(--mono); font-weight: 700; font-size: 15px; cursor: pointer; background: none; border: none; color: var(--ink); padding: 0; }
+.top .brand .tail { color: var(--accent-ink); }
+.oschip {
+  font-family: var(--mono); font-size: 13px; font-weight: 600;
+  border: 1.5px solid var(--ink); border-radius: 999px;
+  background: var(--accent); color: var(--ink);
+  padding: 4px 12px; cursor: pointer;
+}
+.oschip:hover { background: #ffd23f; }
+
+/* ---------- OS picker ---------- */
+.hero { margin: 40px 0 8px; }
+.hero h1 { font-size: 30px; margin: 0 0 6px; }
+.hero h1 .cursor { display: inline-block; width: 0.55em; height: 1.05em; background: var(--accent); vertical-align: text-bottom; animation: blink 1.2s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.hero p { color: var(--muted); margin: 0 0 4px; max-width: 54ch; }
+.oslist { display: grid; gap: 12px; grid-template-columns: 1fr; margin-top: 24px; }
+@media (min-width: 560px) { .oslist { grid-template-columns: repeat(3, 1fr); } }
+.oscard {
+  display: block; width: 100%; text-align: left;
+  background: var(--card); border: 1.5px solid var(--line); border-radius: 12px;
+  padding: 16px; cursor: pointer; font-family: inherit; font-size: inherit; color: inherit;
+}
+.oscard:hover, .oscard:focus-visible { border-color: var(--ink); }
+.oscard .osname { font-family: var(--mono); font-weight: 700; font-size: 17px; display: block; }
+.oscard .osdetail { color: var(--muted); font-size: 13.5px; display: block; margin-top: 4px; }
+.oscard .oscmd { font-family: var(--mono); font-size: 12.5px; color: var(--accent-ink); background: var(--accent-soft); border-radius: 6px; padding: 2px 8px; display: inline-block; margin-top: 10px; }
+
+/* ---------- home ---------- */
+.modlist { display: grid; gap: 14px; }
+.modcard {
+  background: var(--card); border: 1.5px solid var(--line); border-radius: 12px;
+  padding: 16px 16px 14px;
+}
+.modcard h2 { font-size: 17px; margin: 0 0 2px; }
+.modcard .sub { color: var(--muted); font-size: 13.5px; margin: 0 0 12px; }
+.modnum { font-family: var(--mono); font-size: 12px; color: var(--accent-ink); background: var(--accent-soft); border-radius: 6px; padding: 1px 8px; display: inline-block; margin-bottom: 8px; }
+.btnrow { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn {
+  font-family: var(--mono); font-size: 13.5px; font-weight: 600;
+  border: 1.5px solid var(--ink); border-radius: 8px;
+  background: var(--ink); color: #fff; padding: 8px 14px; cursor: pointer;
+}
+.btn:hover { background: #3a4250; border-color: #3a4250; }
+.btn.ghost { background: transparent; color: var(--ink); }
+.btn.ghost:hover { background: var(--accent-soft); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.done { color: var(--ok); font-weight: 700; }
+.lockhint { color: var(--muted); font-size: 13px; margin-top: 6px; }
+.footer { margin-top: 32px; color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 14px; }
+.footer button { background: none; border: none; color: var(--muted); text-decoration: underline; cursor: pointer; font-size: 12.5px; padding: 0; }
+
+/* ---------- step screen ---------- */
+.runhead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.runhead .runtitle { font-family: var(--mono); font-weight: 700; font-size: 14px; }
+.runhead .count { font-family: var(--mono); font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.bar { height: 6px; background: var(--line); border-radius: 999px; overflow: hidden; margin-bottom: 18px; }
+.bar > div { height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.3s ease; }
+
+.theory {
+  background: var(--card); border-left: 4px solid var(--accent);
+  border-radius: 0 10px 10px 0; padding: 10px 14px; margin-bottom: 12px;
+  font-size: 14.5px;
+}
+.note {
+  background: var(--ok-soft); border-left: 4px solid var(--ok);
+  border-radius: 0 10px 10px 0; padding: 8px 14px; margin-bottom: 12px; font-size: 13.5px;
+}
+.question { font-size: 16.5px; font-weight: 650; margin: 0 0 12px; }
+.question .qlabel { font-family: var(--mono); font-size: 11.5px; font-weight: 700; color: var(--accent-ink); text-transform: uppercase; letter-spacing: 0.08em; display: block; margin-bottom: 2px; }
+
+/* ---------- terminal ---------- */
+.term {
+  background: var(--term-bg); border-radius: 12px; overflow: hidden;
+  border: 1.5px solid var(--term-line);
+}
+.term .tbar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--term-line); }
+.term .tbar .dot { width: 10px; height: 10px; border-radius: 50%; background: #46505c; }
+.term .tbar .tname { font-family: var(--mono); font-size: 11.5px; color: var(--term-dim); margin-left: 6px; }
+.scrollback {
+  font-family: var(--mono); font-size: 13px; line-height: 1.45;
+  color: var(--term-out); padding: 12px 14px 4px;
+  max-height: 40vh; min-height: 90px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+}
+.scrollback .in { color: #fff; }
+.scrollback .in .pr { color: var(--accent); }
+.scrollback .out { color: var(--term-dim); }
+.scrollback .bad { color: var(--err); }
+.scrollback .good { color: var(--ok); font-weight: 700; }
+.inline-input { display: flex; align-items: center; gap: 8px; padding: 6px 14px 12px; }
+.inline-input .pr { font-family: var(--mono); font-size: 13px; color: var(--accent); white-space: nowrap; }
+.inline-input input {
+  flex: 1; background: none; border: none; outline: none;
+  font-family: var(--mono); font-size: 16px; color: #fff; caret-color: var(--accent);
+  padding: 6px 0; min-width: 0;
+}
+
+.stepactions { display: flex; gap: 8px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+.hintbox {
+  background: var(--accent-soft); border-left: 4px solid var(--accent);
+  border-radius: 0 10px 10px 0; padding: 8px 14px; margin-top: 12px; font-size: 14px;
+}
+.hintbox code, .theory code, .note code { font-family: var(--mono); font-size: 0.92em; background: rgba(0,0,0,0.06); border-radius: 4px; padding: 0 4px; }
+.tally { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-left: auto; }
+
+/* ---------- summary ---------- */
+.summary { text-align: center; padding: 40px 0; }
+.summary h2 { font-size: 24px; }
+.summary .big { font-family: var(--mono); font-size: 44px; font-weight: 700; color: var(--accent-ink); }
+.summary p { color: var(--muted); }
+
+/* ---------- test mode ---------- */
+.testlog { font-family: var(--mono); font-size: 13px; white-space: pre-wrap; background: var(--card); border-radius: 10px; padding: 14px; }
+.testlog .p { color: var(--ok); }
+.testlog .f { color: var(--err); }
+
+:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+/* BDAL Playground — simulator engine (pure, no DOM).
+ * Works in browser (globalThis.BDALEngine) and node (module.exports). */
+(function (root) {
+'use strict';
+
+var WARN = 'WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable';
+
+var MATRIX_TXT = 'A,0,0,1\nA,0,1,2\nA,1,0,3\nA,1,1,4\nB,0,0,5\nB,0,1,6\nB,1,0,7\nB,1,1,8';
+var JAVA_SRC = '// MatrixMultiplication.java — Mapper + Reducer + driver (see lab kit)';
+
+function dir(children) { return { type: 'dir', children: children || {} }; }
+function file(content) { return { type: 'file', content: content || '' }; }
+
+function createState(os) {
+  var local = dir();
+  var cwd;
+  if (os === 'windows') {
+    local.children['C:'] = dir({
+      BDA: dir({
+        'command3.txt': file('this file moves into hdfs'),
+        'exampleput.txt': file('uploaded with put'),
+        'matrix.txt': file(MATRIX_TXT),
+        'MatrixMultiplication.java': file(JAVA_SRC)
+      })
+    });
+    cwd = ['C:', 'BDA'];
+  } else {
+    local.children['~'] = dir({
+      kit: dir({
+        'Lab-2-HDFS-Basic-Commands': dir({
+          'command3.txt': file('this file moves into hdfs'),
+          'exampleput.txt': file('uploaded with put')
+        })
+      }),
+      mat: dir({
+        'MatrixMultiplication.java': file(JAVA_SRC),
+        'matrix.txt': file(MATRIX_TXT)
+      })
+    });
+    cwd = ['~'];
+  }
+  return {
+    os: os,
+    clusterUp: false,
+    hdfs: dir({ tmp: dir(), user: dir() }),
+    local: local,
+    cwd: cwd,
+    compiled: false,
+    jarBuilt: false,
+    jobRuns: 0,
+    pids: null,
+    pidSeed: 4100
+  };
+}
+
+// ---------- helpers ----------
+
+function tokenize(input) {
+  var tokens = [], cur = '', q = null;
+  for (var i = 0; i < input.length; i++) {
+    var c = input[i];
+    if (q) {
+      if (c === q) { q = null; } else { cur += c; }
+    } else if (c === '"' || c === "'") {
+      q = c;
+    } else if (/\s/.test(c)) {
+      if (cur) { tokens.push(cur); cur = ''; }
+    } else {
+      cur += c;
+    }
+  }
+  if (cur) tokens.push(cur);
+  return tokens;
+}
+
+function ok(output) { return { output: output, ok: true }; }
+function err(output) { return { output: output, ok: false }; }
+
+function isUnix(state) { return state.os !== 'windows'; }
+
+// local path -> array of segments from local root, or null if malformed
+function localSegs(state, p) {
+  p = p.replace(/\\/g, '/');
+  var segs;
+  if (/^[A-Za-z]:/.test(p)) {
+    segs = p.split('/').filter(Boolean);
+    segs[0] = segs[0].toUpperCase();
+  } else if (p === '~' || p.indexOf('~/') === 0) {
+    segs = ['~'].concat(p.slice(2).split('/').filter(Boolean));
+  } else if (p.indexOf('/') === 0) {
+    // absolute unix path — map /home-ish onto '~' root for simplicity
+    segs = ['~'].concat(p.split('/').filter(Boolean));
+  } else {
+    segs = state.cwd.concat(p.split('/').filter(Boolean));
+  }
+  var out = [];
+  for (var i = 0; i < segs.length; i++) {
+    if (segs[i] === '.') continue;
+    else if (segs[i] === '..') out.pop();
+    else out.push(segs[i]);
+  }
+  return out;
+}
+
+function getNode(rootDir, segs) {
+  var node = rootDir;
+  for (var i = 0; i < segs.length; i++) {
+    if (!node || node.type !== 'dir') return null;
+    node = node.children[segs[i]];
+  }
+  return node || null;
+}
+
+function hdfsSegs(p) {
+  if (p.indexOf('/') !== 0) p = '/user/student/' + p;
+  return p.split('/').filter(Boolean);
+}
+
+function hdfsPathStr(segs) { return '/' + segs.join('/'); }
+
+function cwdString(state) {
+  if (isUnix(state)) return state.cwd.join('/');
+  return state.cwd[0] + '\\' + state.cwd.slice(1).join('\\');
+}
+
+// ---------- cluster ----------
+
+var UNIX_DAEMONS = ['NameNode', 'DataNode', 'SecondaryNameNode', 'ResourceManager', 'NodeManager'];
+var WIN_DAEMONS = ['NameNode', 'DataNode', 'ResourceManager', 'NodeManager'];
+
+function startCluster(state) {
+  if (state.clusterUp) return ok('cluster is already running (check with: jps)');
+  state.clusterUp = true;
+  var daemons = isUnix(state) ? UNIX_DAEMONS : WIN_DAEMONS;
+  state.pids = {};
+  var pid = state.pidSeed;
+  for (var i = 0; i < daemons.length; i++) {
+    pid += 137 + i * 11;
+    state.pids[daemons[i]] = pid;
+  }
+  if (isUnix(state)) {
+    return ok('Starting namenodes on [localhost]\nStarting datanodes\nStarting secondary namenodes [localhost]\nStarting resourcemanager\nStarting nodemanagers');
+  }
+  return ok('starting namenode, logging to console window\nstarting datanode, logging to console window\nstarting yarn daemons\n(4 new console windows opened — leave them open, closing one kills that daemon)');
+}
+
+function stopCluster(state) {
+  if (!state.clusterUp) return ok('cluster is not running');
+  state.clusterUp = false;
+  state.pids = null;
+  return ok(isUnix(state)
+    ? 'Stopping namenodes on [localhost]\nStopping datanodes\nStopping secondary namenodes [localhost]\nStopping resourcemanager\nStopping nodemanagers'
+    : 'stopping namenode\nstopping datanode\nstopping yarn daemons');
+}
+
+function jps(state) {
+  state.pidSeed += 7;
+  var lines = [];
+  if (state.clusterUp) {
+    var names = Object.keys(state.pids);
+    for (var i = 0; i < names.length; i++) lines.push(state.pids[names[i]] + ' ' + names[i]);
+  }
+  lines.push((state.pidSeed + 900) + ' Jps');
+  return ok(lines.join('\n'));
+}
+
+// ---------- fs (hadoop fs / hdfs dfs) ----------
+
+function connRefused(verb) {
+  return err(verb + ': Call From localhost to localhost:9000 failed on connection exception: ' +
+    'java.net.ConnectException: Connection refused; For more details see:  http://wiki.apache.org/hadoop/ConnectionRefused\n' +
+    '(hint: the cluster is not running — nothing is broken)');
+}
+
+function lsEntryLine(name, node, pathPrefix) {
+  var full = (pathPrefix === '/' ? '' : pathPrefix) + '/' + name;
+  if (node.type === 'dir') {
+    return 'drwxr-xr-x   - student supergroup          0 2026-07-28 10:00 ' + full;
+  }
+  var size = String(node.content.length);
+  var pad = '';
+  for (var i = size.length; i < 10; i++) pad += ' ';
+  return '-rw-r--r--   1 student supergroup ' + pad + size + ' 2026-07-28 10:00 ' + full;
+}
+
+function fsCmd(state, args, family) {
+  if (!args.length) return err('Usage: ' + family + ' -<command> [args]');
+  var sub = args[0];
+  var verb = sub.replace(/^-+/, '');
+  if (!state.clusterUp) {
+    var known = ['-ls', '-mkdir', '-copyFromLocal', '-put', '-copyToLocal', '-get', '-cat', '-rm', '-rmdir',
+      '-mv', '-cp', '-du', '-tail', '-touchz', '-count'];
+    if (known.indexOf(sub) !== -1) return connRefused(verb);
+  }
+  var rest = args.slice(1);
+  switch (sub) {
+    case '-ls': return fsLs(state, rest);
+    case '-mkdir': return fsMkdir(state, rest);
+    case '-copyFromLocal':
+    case '-put': return fsPut(state, rest, verb);
+    case '-copyToLocal':
+    case '-get': return fsGet(state, rest, verb);
+    case '-cat': return fsCat(state, rest);
+    case '-rm': return fsRm(state, rest);
+    case '-rmdir': return fsRmdir(state, rest);
+    case '-mv':
+    case '-cp': return fsMvCp(state, rest, verb);
+    case '-du': return fsDu(state, rest);
+    case '-tail': return fsTail(state, rest);
+    case '-touchz': return fsTouchz(state, rest);
+    case '-count': return fsCount(state, rest);
+    default:
+      return err(sub + ': Unknown command');
+  }
+}
+
+function cloneNode(node) { return JSON.parse(JSON.stringify(node)); }
+
+function fsMvCp(state, rest, verb) {
+  var fp = flagsAndPaths(rest);
+  if (fp.paths.length < 2) return err('-' + verb + ': Not enough arguments');
+  var srcSegs = hdfsSegs(fp.paths[0]);
+  var srcNode = getNode(state.hdfs, srcSegs);
+  if (!srcNode) return err(verb + ': `' + hdfsPathStr(srcSegs) + "': No such file or directory");
+  var dstSegs = hdfsSegs(fp.paths[1]);
+  var dstNode = getNode(state.hdfs, dstSegs);
+  var parent, finalName;
+  if (dstNode && dstNode.type === 'dir') { parent = dstNode; finalName = srcSegs[srcSegs.length - 1]; }
+  else if (dstNode) { return err(verb + ': `' + hdfsPathStr(dstSegs) + "': File exists"); }
+  else {
+    parent = getNode(state.hdfs, dstSegs.slice(0, -1));
+    if (!parent || parent.type !== 'dir') return err(verb + ': `' + hdfsPathStr(dstSegs) + "': No such file or directory");
+    finalName = dstSegs[dstSegs.length - 1];
+  }
+  parent.children[finalName] = cloneNode(srcNode);
+  if (verb === 'mv') {
+    var srcParent = getNode(state.hdfs, srcSegs.slice(0, -1));
+    delete srcParent.children[srcSegs[srcSegs.length - 1]];
+  }
+  return ok(WARN);
+}
+
+function sumSize(node) {
+  if (node.type === 'file') return node.content.length;
+  var total = 0;
+  for (var k in node.children) total += sumSize(node.children[k]);
+  return total;
+}
+
+function humanSize(n) {
+  if (n < 1024) return String(n);
+  return (n / 1024).toFixed(1) + ' K';
+}
+
+function fsDu(state, rest) {
+  var fp = flagsAndPaths(rest);
+  var human = fp.flags.indexOf('-h') !== -1;
+  var p = fp.paths[0] || '/user/student';
+  var segs = hdfsSegs(p);
+  var node = getNode(state.hdfs, segs);
+  if (!node) return err('du: `' + hdfsPathStr(segs) + "': No such file or directory");
+  var out = [WARN];
+  var entries = node.type === 'dir' ? Object.keys(node.children).sort() : [null];
+  for (var i = 0; i < entries.length; i++) {
+    var child = entries[i] === null ? node : node.children[entries[i]];
+    var full = entries[i] === null ? hdfsPathStr(segs) : hdfsPathStr(segs) + '/' + entries[i];
+    var size = sumSize(child);
+    var shown = human ? humanSize(size) : String(size);
+    out.push(shown + '  ' + shown + '  ' + full);
+  }
+  return ok(out.join('\n'));
+}
+
+function fsTail(state, rest) {
+  var fp = flagsAndPaths(rest);
+  if (!fp.paths.length) return err('-tail: Not enough arguments');
+  var segs = hdfsSegs(fp.paths[0]);
+  var node = getNode(state.hdfs, segs);
+  if (!node) return err('tail: `' + hdfsPathStr(segs) + "': No such file or directory");
+  if (node.type === 'dir') return err('tail: `' + hdfsPathStr(segs) + "': Is a directory");
+  var content = node.content;
+  var tail = content.length > 1024 ? content.slice(content.length - 1024) : content;
+  return ok(WARN + '\n' + tail);
+}
+
+function fsTouchz(state, rest) {
+  var fp = flagsAndPaths(rest);
+  if (!fp.paths.length) return err('-touchz: Not enough arguments');
+  var segs = hdfsSegs(fp.paths[0]);
+  var existing = getNode(state.hdfs, segs);
+  if (existing && existing.type === 'dir') return err('touchz: `' + hdfsPathStr(segs) + "': Is a directory");
+  var parent = getNode(state.hdfs, segs.slice(0, -1));
+  if (!parent || parent.type !== 'dir') return err('touchz: `' + hdfsPathStr(segs) + "': No such file or directory");
+  parent.children[segs[segs.length - 1]] = file('');
+  return ok(WARN);
+}
+
+function countDirs(node) {
+  if (node.type !== 'dir') return 0;
+  var n = 1;
+  for (var k in node.children) n += countDirs(node.children[k]);
+  return n;
+}
+function countFiles(node) {
+  if (node.type === 'file') return 1;
+  var n = 0;
+  for (var k in node.children) n += countFiles(node.children[k]);
+  return n;
+}
+
+function fsCount(state, rest) {
+  var fp = flagsAndPaths(rest);
+  var p = fp.paths[0] || '/user/student';
+  var segs = hdfsSegs(p);
+  var node = getNode(state.hdfs, segs);
+  if (!node) return err('count: `' + hdfsPathStr(segs) + "': No such file or directory");
+  return ok(WARN + '\n' +
+    '           ' + countDirs(node) + '            ' + countFiles(node) + '                 ' + sumSize(node) + ' ' + hdfsPathStr(segs));
+}
+
+function flagsAndPaths(rest) {
+  var flags = [], paths = [];
+  for (var i = 0; i < rest.length; i++) {
+    if (rest[i].indexOf('-') === 0 && !/^-?\/|^-?[A-Za-z]:/.test(rest[i])) flags.push(rest[i]);
+    else paths.push(rest[i]);
+  }
+  return { flags: flags, paths: paths };
+}
+
+function fsMkdir(state, rest) {
+  var fp = flagsAndPaths(rest);
+  if (!fp.paths.length) return err('-mkdir: Not enough arguments');
+  var withP = fp.flags.indexOf('-p') !== -1;
+  for (var i = 0; i < fp.paths.length; i++) {
+    var segs = hdfsSegs(fp.paths[i]);
+    var shown = hdfsPathStr(segs);
+    if (getNode(state.hdfs, segs)) return err('mkdir: `' + shown + "': File exists");
+    var parent = getNode(state.hdfs, segs.slice(0, -1));
+    if (!parent || parent.type !== 'dir') {
+      if (!withP) return err('mkdir: `' + shown + "': No such file or directory");
+      parent = state.hdfs;
+      for (var j = 0; j < segs.length - 1; j++) {
+        if (!parent.children[segs[j]]) parent.children[segs[j]] = dir();
+        parent = parent.children[segs[j]];
+      }
+    }
+    parent.children[segs[segs.length - 1]] = dir();
+  }
+  return ok(WARN);
+}
+
+function fsPut(state, rest, verb) {
+  var fp = flagsAndPaths(rest);
+  var force = fp.flags.indexOf('-f') !== -1;
+  if (fp.paths.length < 2) return err('-' + verb + ': Not enough arguments');
+  var srcPath = fp.paths[0], dstPath = fp.paths[1];
+  if (/\s/.test(srcPath)) return err(verb + ': unexpected URISyntaxException');
+  var srcSegs = localSegs(state, srcPath);
+  var srcNode = getNode(state.local, srcSegs);
+  if (!srcNode || srcNode.type !== 'file') {
+    return err(verb + ": `" + srcPath + "': No such file or directory");
+  }
+  var name = srcSegs[srcSegs.length - 1];
+  var dstSegs = hdfsSegs(dstPath);
+  var dstNode = getNode(state.hdfs, dstSegs);
+  var parent, finalName;
+  if (dstNode && dstNode.type === 'dir') { parent = dstNode; finalName = name; }
+  else if (dstNode && dstNode.type === 'file') {
+    if (!force) return err(verb + ': `' + hdfsPathStr(dstSegs) + "': File exists");
+    parent = getNode(state.hdfs, dstSegs.slice(0, -1)); finalName = dstSegs[dstSegs.length - 1];
+  } else {
+    parent = getNode(state.hdfs, dstSegs.slice(0, -1));
+    if (!parent || parent.type !== 'dir') return err(verb + ': `' + hdfsPathStr(dstSegs) + "': No such file or directory");
+    finalName = dstSegs[dstSegs.length - 1];
+  }
+  if (parent.children[finalName] && !force) {
+    return err(verb + ': `' + hdfsPathStr(dstSegs) + '/' + finalName + "': File exists");
+  }
+  parent.children[finalName] = file(srcNode.content);
+  return ok(WARN);
+}
+
+function fsGet(state, rest, verb) {
+  var fp = flagsAndPaths(rest);
+  if (fp.paths.length < 2) return err('-' + verb + ': Not enough arguments');
+  var srcSegs = hdfsSegs(fp.paths[0]);
+  var srcNode = getNode(state.hdfs, srcSegs);
+  var errVerb = verb === 'copyToLocal' ? 'copyToLocal' : 'get';
+  if (!srcNode || srcNode.type !== 'file') {
+    return err(errVerb + ': `' + hdfsPathStr(srcSegs) + "': No such file or directory");
+  }
+  var name = srcSegs[srcSegs.length - 1];
+  var dstPath = fp.paths[1];
+  var dstSegs = localSegs(state, dstPath === '.' ? '.' : dstPath);
+  var dstNode = getNode(state.local, dstSegs);
+  var parent, finalName;
+  if (dstNode && dstNode.type === 'dir') { parent = dstNode; finalName = name; }
+  else {
+    parent = getNode(state.local, dstSegs.slice(0, -1));
+    if (!parent || parent.type !== 'dir') return err(errVerb + ': `' + dstPath + "': No such file or directory");
+    finalName = dstSegs[dstSegs.length - 1];
+  }
+  parent.children[finalName] = file(srcNode.content);
+  return ok(WARN);
+}
+
+function fsCat(state, rest) {
+  var fp = flagsAndPaths(rest);
+  if (!fp.paths.length) return err('-cat: Not enough arguments');
+  var out = [WARN];
+  for (var i = 0; i < fp.paths.length; i++) {
+    var segs = hdfsSegs(fp.paths[i]);
+    var node = getNode(state.hdfs, segs);
+    if (!node) return err('cat: `' + hdfsPathStr(segs) + "': No such file or directory");
+    if (node.type === 'dir') return err('cat: `' + hdfsPathStr(segs) + "': Is a directory");
+    out.push(node.content);
+  }
+  return ok(out.join('\n'));
+}
+
+function fsRm(state, rest) {
+  var fp = flagsAndPaths(rest);
+  var recursive = fp.flags.indexOf('-r') !== -1 || fp.flags.indexOf('-R') !== -1;
+  if (!fp.paths.length) return err('-rm: Not enough arguments');
+  var out = [WARN];
+  for (var i = 0; i < fp.paths.length; i++) {
+    var segs = hdfsSegs(fp.paths[i]);
+    var shown = hdfsPathStr(segs);
+    var node = getNode(state.hdfs, segs);
+    if (!node) return err('rm: `' + shown + "': No such file or directory");
+    if (node.type === 'dir' && !recursive) return err('rm: `' + shown + "': Is a directory");
+    var parent = getNode(state.hdfs, segs.slice(0, -1));
+    delete parent.children[segs[segs.length - 1]];
+    out.push('Deleted ' + shown);
+  }
+  return ok(out.join('\n'));
+}
+
+function fsRmdir(state, rest) {
+  var fp = flagsAndPaths(rest);
+  if (!fp.paths.length) return err('-rmdir: Not enough arguments');
+  var segs = hdfsSegs(fp.paths[0]);
+  var shown = hdfsPathStr(segs);
+  var node = getNode(state.hdfs, segs);
+  if (!node) return err('rmdir: `' + shown + "': No such file or directory");
+  if (node.type !== 'dir') return err('rmdir: `' + shown + "': Is not a directory");
+  if (Object.keys(node.children).length) return err('rmdir: `' + shown + "': Directory is not empty");
+  var parent = getNode(state.hdfs, segs.slice(0, -1));
+  delete parent.children[segs[segs.length - 1]];
+  return ok(WARN);
+}
+
+function fsLs(state, rest) {
+  var p = rest.filter(function (a) { return a.indexOf('-') !== 0; })[0] || '/user/student';
+  var segs = hdfsSegs(p);
+  var node = getNode(state.hdfs, segs);
+  var shown = hdfsPathStr(segs);
+  if (!node) return err('ls: `' + shown + "': No such file or directory");
+  var out = [WARN];
+  if (node.type === 'file') {
+    out.push(lsEntryLine(segs[segs.length - 1], node, hdfsPathStr(segs.slice(0, -1)) || '/'));
+    return ok(out.join('\n'));
+  }
+  var names = Object.keys(node.children).sort();
+  out.push('Found ' + names.length + ' items');
+  for (var i = 0; i < names.length; i++) {
+    out.push(lsEntryLine(names[i], node.children[names[i]], shown === '/' ? '/' : shown));
+  }
+  return ok(out.join('\n'));
+}
+
+// ---------- local commands ----------
+
+function localLs(state) {
+  var node = getNode(state.local, state.cwd);
+  var names = Object.keys(node.children).sort();
+  return ok(names.join('\n'));
+}
+
+function localCd(state, p) {
+  if (!p) { state.cwd = isUnix(state) ? ['~'] : ['C:', 'BDA']; return ok(''); }
+  var segs = localSegs(state, p);
+  var node = getNode(state.local, segs);
+  if (!node || node.type !== 'dir') return err('cd: no such file or directory: ' + p);
+  state.cwd = segs;
+  return ok('');
+}
+
+function localMkdir(state, args) {
+  var paths = args.filter(function (a) { return a.indexOf('-') !== 0; });
+  if (!paths.length) return err('mkdir: missing operand');
+  for (var i = 0; i < paths.length; i++) {
+    var segs = localSegs(state, paths[i]);
+    var parent = getNode(state.local, segs.slice(0, -1));
+    if (!parent || parent.type !== 'dir') {
+      if (args.indexOf('-p') === -1) return err('mkdir: cannot create directory ‘' + paths[i] + '’: No such file or directory');
+      // -p: create the chain
+      parent = state.local;
+      for (var j = 0; j < segs.length - 1; j++) {
+        if (!parent.children[segs[j]]) parent.children[segs[j]] = dir();
+        parent = parent.children[segs[j]];
+      }
+    }
+    if (!parent.children[segs[segs.length - 1]]) parent.children[segs[segs.length - 1]] = dir();
+  }
+  return ok('');
+}
+
+// ---------- Lab 3 toolchain ----------
+
+var CLASSPATH = '/opt/hadoop/etc/hadoop:/opt/hadoop/share/hadoop/common/lib/*:/opt/hadoop/share/hadoop/common/*:/opt/hadoop/share/hadoop/hdfs/*:/opt/hadoop/share/hadoop/mapreduce/*:/opt/hadoop/share/hadoop/yarn/*';
+
+var PART_R = '0,0\t19\n0,1\t22\n1,0\t43\n1,1\t50';
+
+function javac(state, args) {
+  var srcName = null;
+  for (var i = 0; i < args.length; i++) {
+    if (/\.java$/.test(args[i])) srcName = args[i];
+  }
+  if (!srcName) return err('javac: no source files');
+  var hasCp = args.indexOf('-classpath') !== -1 || args.indexOf('-cp') !== -1;
+  if (!hasCp) {
+    return err('MatrixMultiplication.java:3: error: package org.apache.hadoop.conf does not exist\n' +
+      '(hint: compile against Hadoop’s jars with  -classpath "$(hadoop classpath)")');
+  }
+  var segs = localSegs(state, srcName);
+  var node = getNode(state.local, segs);
+  if (!node || node.type !== 'file') return err('javac: file not found: ' + srcName);
+  var cwdNode = getNode(state.local, state.cwd);
+  cwdNode.children['MatrixMultiplication.class'] = file('<bytecode>');
+  cwdNode.children['MatrixMultiplication$MatMapper.class'] = file('<bytecode>');
+  cwdNode.children['MatrixMultiplication$MatReducer.class'] = file('<bytecode>');
+  state.compiled = true;
+  return ok('');
+}
+
+function jarTool(state, args) {
+  if (!args.length || args[0].indexOf('-c') !== 0) return err('jar: bad or missing flags (use: jar -cf MatrixMultiplication.jar *.class)');
+  if (!state.compiled) return err('jar: no .class files found — compile first with javac');
+  var jarName = null;
+  for (var i = 0; i < args.length; i++) {
+    if (/\.jar$/.test(args[i])) jarName = args[i];
+  }
+  if (!jarName) return err('jar: no output jar name given');
+  var cwdNode = getNode(state.local, state.cwd);
+  cwdNode.children[jarName.split('/').pop()] = file('<jar>');
+  state.jarBuilt = true;
+  var verbose = args[0].indexOf('v') !== -1;
+  return ok(verbose
+    ? 'added manifest\nadding: MatrixMultiplication.class\nadding: MatrixMultiplication$MatMapper.class\nadding: MatrixMultiplication$MatReducer.class'
+    : '');
+}
+
+function hadoopJar(state, args) {
+  if (args.length < 4) return err('Usage: hadoop jar <jar> <mainClass> <input> <output>');
+  var jarName = args[0], mainClass = args[1], inPath = args[2], outPath = args[3];
+  if (!state.clusterUp) return connRefused('mapreduce');
+  var jarNode = getNode(state.local, localSegs(state, jarName));
+  if (!jarNode || !state.jarBuilt) return err('Not a valid JAR: ' + jarName);
+  if (mainClass !== 'MatrixMultiplication') return err('java.lang.ClassNotFoundException: ' + mainClass);
+  var inSegs = hdfsSegs(inPath);
+  if (!getNode(state.hdfs, inSegs)) {
+    return err('org.apache.hadoop.mapreduce.lib.input.InvalidInputException: Input path does not exist: hdfs://localhost:9000' + hdfsPathStr(inSegs));
+  }
+  var outSegs = hdfsSegs(outPath);
+  if (getNode(state.hdfs, outSegs)) {
+    return err('org.apache.hadoop.mapred.FileAlreadyExistsException: Output directory hdfs://localhost:9000' + hdfsPathStr(outSegs) + ' already exists\n' +
+      '(hint: delete it first —  hdfs dfs -rm -r ' + hdfsPathStr(outSegs) + ')');
+  }
+  var parent = state.hdfs;
+  for (var i = 0; i < outSegs.length - 1; i++) {
+    if (!parent.children[outSegs[i]]) parent.children[outSegs[i]] = dir();
+    parent = parent.children[outSegs[i]];
+  }
+  parent.children[outSegs[outSegs.length - 1]] = dir({
+    '_SUCCESS': file(''),
+    'part-r-00000': file(PART_R)
+  });
+  state.jobRuns += 1;
+  var jobId = 'job_1784959837525_000' + state.jobRuns;
+  return ok([
+    'INFO client.DefaultNoHARMFailoverProxyProvider: Connecting to ResourceManager at /0.0.0.0:8032',
+    'INFO mapreduce.JobSubmitter: number of splits:1',
+    'INFO mapreduce.Job: Running job: ' + jobId,
+    'INFO mapreduce.Job:  map 0% reduce 0%',
+    'INFO mapreduce.Job:  map 100% reduce 0%',
+    'INFO mapreduce.Job:  map 100% reduce 100%',
+    'INFO mapreduce.Job: Job ' + jobId + ' completed successfully'
+  ].join('\n'));
+}
+
+// ---------- dispatch ----------
+
+function notFound(state, cmd) {
+  var msg = isUnix(state)
+    ? 'zsh: command not found: ' + cmd
+    : "'" + cmd + "' is not recognized as an internal or external command";
+  return err(msg);
+}
+
+function runCommand(state, input) {
+  var tokens = tokenize(String(input || '').trim());
+  if (!tokens.length) return ok('');
+  var cmd = tokens[0];
+
+  // cluster lifecycle (per OS)
+  if (cmd === 'hadoop-start' || cmd === 'hadoop-stop') {
+    if (!isUnix(state)) {
+      var r = notFound(state, cmd);
+      r.output += '\n(on native Windows the cluster starts with: start-all.cmd / stops with: stop-all.cmd)';
+      return r;
+    }
+    return cmd === 'hadoop-start' ? startCluster(state) : stopCluster(state);
+  }
+  if (cmd === 'start-all.cmd' || cmd === 'stop-all.cmd') {
+    if (isUnix(state)) {
+      var r2 = notFound(state, cmd);
+      r2.output += '\n(on Linux/Mac this cluster starts with: hadoop-start / stops with: hadoop-stop)';
+      return r2;
+    }
+    return cmd === 'start-all.cmd' ? startCluster(state) : stopCluster(state);
+  }
+
+  if (cmd === 'jps') return jps(state);
+
+  if (cmd === 'hadoop' || cmd === 'hdfs') {
+    var sub = tokens[1];
+    if ((cmd === 'hadoop' && sub === 'fs') || (cmd === 'hdfs' && sub === 'dfs')) {
+      return fsCmd(state, tokens.slice(2), cmd === 'hadoop' ? 'hadoop fs' : 'hdfs dfs');
+    }
+    if (cmd === 'hadoop' && sub === 'classpath') return ok(CLASSPATH);
+    if (cmd === 'hadoop' && sub === 'jar') return hadoopJar(state, tokens.slice(2));
+    if (cmd === 'hadoop' && sub === 'version') {
+      var ver = state.os === 'windows' ? '3.3.6' : '3.4.1';
+      return ok('Hadoop ' + ver + '\nSource code repository https://github.com/apache/hadoop.git\nCompiled with protoc\nThis command was run using /opt/hadoop/share/hadoop/common/hadoop-common-' + ver + '.jar');
+    }
+    if (cmd === 'hdfs' && sub === 'dfsadmin') {
+      if (tokens[2] !== '-report') return err('dfsadmin: unknown option ' + (tokens[2] || '') + ' (try: hdfs dfsadmin -report)');
+      if (!state.clusterUp) return connRefused('report');
+      var used = 4096 + JSON.stringify(state.hdfs).length;
+      return ok([
+        'Configured Capacity: 250790436864 (233.57 GB)',
+        'Present Capacity: 198654312448 (185.01 GB)',
+        'DFS Remaining: 198654308352 (185.01 GB)',
+        'DFS Used: ' + used + ' (' + (used / 1024).toFixed(1) + ' KB)',
+        'DFS Used%: 0.00%',
+        'Live datanodes (1):',
+        '',
+        'Name: 127.0.0.1:9866 (localhost)',
+        'Hostname: localhost',
+        'Decommission Status : Normal',
+        'DFS Used: ' + used,
+        'Last contact: just now'
+      ].join('\n'));
+    }
+    return err(cmd + ' ' + (sub || '') + ': unknown subcommand (try: ' + (cmd === 'hadoop' ? 'hadoop fs -…' : 'hdfs dfs -…') + ')');
+  }
+
+  if (cmd === 'javac') return javac(state, tokens.slice(1));
+  if (cmd === 'jar') return jarTool(state, tokens.slice(1));
+
+  if (cmd === 'ls') return localLs(state);
+  if (cmd === 'cd') return localCd(state, tokens[1]);
+  if (cmd === 'pwd') return ok(cwdString(state));
+  if (cmd === 'mkdir') return localMkdir(state, tokens.slice(1));
+
+  return notFound(state, cmd);
+}
+
+var api = { createState: createState, runCommand: runCommand, WARN: WARN, cwdString: cwdString };
+root.BDALEngine = api;
+if (typeof module !== 'undefined' && module.exports) module.exports = api;
+
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+</script>
+<script>
+/* BDAL Playground — lesson data. Pure data + generators; engine passed in where needed.
+ * Step: { theory?, question, hints:[h1,h2], answer(os), check(state,result,input), note? } */
+(function (root) {
+'use strict';
+
+// ---------- helpers ----------
+
+function hnode(state, path) {
+  var segs = path.split('/').filter(Boolean);
+  var node = state.hdfs;
+  for (var i = 0; i < segs.length; i++) {
+    if (!node || node.type !== 'dir') return null;
+    node = node.children[segs[i]];
+  }
+  return node || null;
+}
+
+function lnode(state, segs) {
+  var node = state.local;
+  for (var i = 0; i < segs.length; i++) {
+    if (!node || node.type !== 'dir') return null;
+    node = node.children[segs[i]];
+  }
+  return node || null;
+}
+
+function cwdHas(state, name) {
+  var node = lnode(state, state.cwd.concat([name]));
+  return !!node;
+}
+
+function isWin(os) { return os === 'windows'; }
+
+// canonical per-OS fragments
+function startCmd(os) { return isWin(os) ? 'start-all.cmd' : 'hadoop-start'; }
+function kitCd(os) { return isWin(os) ? 'cd C:/BDA' : 'cd ~/kit/Lab-2-HDFS-Basic-Commands'; }
+function matCd(os) { return isWin(os) ? 'cd C:/BDA' : 'cd ~/mat'; }
+function localRef(os, name) { return isWin(os) ? 'C:/BDA/' + name : name; }
+function javacCmd(os) {
+  return isWin(os)
+    ? 'javac -classpath "%HADOOP_HOME%\\share\\hadoop\\common\\*;%HADOOP_HOME%\\share\\hadoop\\mapreduce\\*" -d . MatrixMultiplication.java'
+    : 'javac -classpath "$(hadoop classpath)" -d . MatrixMultiplication.java';
+}
+function jarCmd(os) {
+  return isWin(os) ? 'jar -cvf MatrixMultiplication.jar -C . .' : 'jar -cf MatrixMultiplication.jar *.class';
+}
+
+// generic step builders (used by modules, recaps and exam so paths can vary)
+
+function stepStart() {
+  return {
+    theory: 'A Hadoop cluster is a team of daemon (background) processes — NameNode, DataNode, ResourceManager, NodeManager… They never start by themselves: every lab session begins by starting them.',
+    question: 'Start your Hadoop cluster.',
+    hints: ['One short command starts everything. On Linux/Mac it is a hyphenated word; on Windows it is a .cmd script.',
+      'It begins with “start” on Windows, and with “hadoop-” on Linux/Mac.'],
+    answer: startCmd,
+    check: function (state) { return state.clusterUp; }
+  };
+}
+
+function stepJps() {
+  return {
+    theory: 'jps lists the running Java processes — it is THE health check. Expect 5 daemons on Linux/Mac, 4 on native Windows (no SecondaryNameNode there). If a daemon is missing, nothing else will work.',
+    question: 'Verify the cluster daemons are actually running.',
+    hints: ['It is a 3-letter command: Java Process Status.', 'Just type the three letters.'],
+    answer: function () { return 'jps'; },
+    check: function (state, result, input) { return result.ok && /^jps$/.test(input.trim()); }
+  };
+}
+
+function stepLsRoot(expectText) {
+  return {
+    theory: 'HDFS is a SEPARATE filesystem living inside those daemons — your normal files are not in it. You reach it with `hadoop fs -…` (or `hdfs dfs -…`, identical). Web view: http://localhost:9870 → Utilities. Jobs: http://localhost:8088.',
+    question: 'List the ROOT directory of HDFS.',
+    hints: ['hadoop fs -ls needs a path; the HDFS root is “/”.', 'Shape: hadoop fs -ls <path>  — the root path is a single slash.'],
+    answer: function () { return 'hadoop fs -ls /'; },
+    check: function (state, result, input) {
+      return result.ok && /-ls\s+\/\s*$/.test(input) && (!expectText || result.output.indexOf(expectText) !== -1);
+    }
+  };
+}
+
+function stepMkdir(path, theory) {
+  return {
+    theory: theory,
+    question: 'Create the directory ' + path + ' in HDFS.',
+    hints: ['The fs subcommand is -mkdir, and HDFS paths start at “/”.', 'Shape: hadoop fs -mkdir ' + path],
+    answer: function () { return 'hadoop fs -mkdir ' + path; },
+    check: function (state) { var n = hnode(state, path); return !!n && n.type === 'dir'; }
+  };
+}
+
+function stepLs(path, mustContain) {
+  return {
+    question: 'List ' + path + ' to confirm.',
+    hints: ['Same -ls as before, different path.', 'Shape: hadoop fs -ls ' + path],
+    answer: function () { return 'hadoop fs -ls ' + path; },
+    check: function (state, result, input) {
+      return result.ok && input.indexOf('-ls') !== -1 && result.output.indexOf(mustContain) !== -1;
+    }
+  };
+}
+
+function stepCd(cdCmd, theory) {
+  return {
+    theory: theory,
+    question: 'Move into the folder that holds the sample files.',
+    hints: ['Plain shell cd — no hadoop involved.', 'Shape: ' + cdCmd('linux') + '   (Windows: ' + cdCmd('windows') + ')'],
+    answer: cdCmd,
+    check: function (state, result, input) {
+      if (!result.ok || !/^cd\s/.test(input.trim())) return false;
+      var last = state.cwd[state.cwd.length - 1];
+      return last === 'Lab-2-HDFS-Basic-Commands' || last === 'BDA' || last === 'mat';
+    }
+  };
+}
+
+function stepPut(fileName, hdfsDir, opts) {
+  opts = opts || {};
+  var verb = opts.useAlias ? '-put' : '-copyFromLocal';
+  return {
+    theory: opts.theory,
+    note: opts.note,
+    question: 'Copy the LOCAL file ' + fileName + ' into HDFS directory ' + hdfsDir + (opts.useAlias ? ' (use the short alias this time).' : '.'),
+    hints: ['Local → HDFS is -copyFromLocal (or its alias -put). Arguments: local source first, HDFS destination second.',
+      'Shape: hadoop fs ' + verb + ' ' + fileName + ' ' + hdfsDir + '   (Windows: give the full C:/… path to the file)'],
+    answer: function (os) { return 'hadoop fs ' + verb + ' ' + localRef(os, fileName) + ' ' + hdfsDir; },
+    check: function (state) { var n = hnode(state, hdfsDir + '/' + fileName); return !!n && n.type === 'file'; }
+  };
+}
+
+function stepLocalMkdir(dirName) {
+  return {
+    theory: 'Downloads out of HDFS need a landing folder on your normal disk — make one.',
+    question: 'Create a LOCAL folder called ' + dirName + ' (in your current directory).',
+    hints: ['Plain shell mkdir, not hadoop fs.', 'Shape: mkdir -p ' + dirName],
+    answer: function (os) { return isWin(os) ? 'mkdir ' + dirName : 'mkdir -p ' + dirName; },
+    check: function (state) { return cwdHas(state, dirName); }
+  };
+}
+
+function stepGet(hdfsPath, localDir, opts) {
+  opts = opts || {};
+  var verb = opts.useAlias ? '-get' : '-copyToLocal';
+  var fname = hdfsPath.split('/').pop();
+  return {
+    theory: opts.theory,
+    note: opts.note,
+    question: 'Copy ' + hdfsPath + ' OUT of HDFS into your local ' + localDir + ' folder' + (opts.useAlias ? ' (short alias).' : '.'),
+    hints: ['HDFS → local is -copyToLocal (or its alias -get). HDFS source first, local destination second — the mirror image of put.',
+      'Shape: hadoop fs ' + verb + ' ' + hdfsPath + ' ' + localDir + '/'],
+    answer: function () { return 'hadoop fs ' + verb + ' ' + hdfsPath + ' ' + localDir + '/'; },
+    check: function (state) {
+      return cwdHas(state, localDir) && !!lnode(state, state.cwd.concat([localDir, fname]));
+    }
+  };
+}
+
+function stepCat(hdfsPath, contentFragment) {
+  return {
+    theory: '-cat prints a file’s contents straight from HDFS — the quickest way to check what is inside.',
+    question: 'Show the contents of ' + hdfsPath + '.',
+    hints: ['Same idea as Unix cat, but as an fs subcommand.', 'Shape: hadoop fs -cat ' + hdfsPath],
+    answer: function () { return 'hadoop fs -cat ' + hdfsPath; },
+    check: function (state, result, input) {
+      return result.ok && input.indexOf('-cat') !== -1 && result.output.indexOf(contentFragment) !== -1;
+    }
+  };
+}
+
+function stepRmFile(hdfsPath, theory) {
+  return {
+    theory: theory,
+    question: 'Delete the FILE ' + hdfsPath + ' from HDFS.',
+    hints: ['-rm deletes files (it refuses directories without -r).', 'Shape: hadoop fs -rm ' + hdfsPath],
+    answer: function () { return 'hadoop fs -rm ' + hdfsPath; },
+    check: function (state, result, input) { return result.ok && input.indexOf('-rm') !== -1 && !hnode(state, hdfsPath); }
+  };
+}
+
+function stepRmdir(hdfsPath) {
+  return {
+    theory: '-rmdir removes a directory ONLY if it is empty — it is the safe delete. (You just emptied this one.)',
+    question: 'Remove the now-empty directory ' + hdfsPath + '.',
+    hints: ['Not -rm this time — the empty-only variant.', 'Shape: hadoop fs -rmdir ' + hdfsPath],
+    answer: function () { return 'hadoop fs -rmdir ' + hdfsPath; },
+    check: function (state, result, input) { return result.ok && input.indexOf('-rmdir') !== -1 && !hnode(state, hdfsPath); }
+  };
+}
+
+function stepRmR(hdfsPath, theory) {
+  return {
+    theory: theory,
+    question: 'Delete ' + hdfsPath + ' and EVERYTHING inside it, in one command.',
+    hints: ['-rm plus the recursive flag.', 'Shape: hadoop fs -rm -r ' + hdfsPath],
+    answer: function () { return 'hadoop fs -rm -r ' + hdfsPath; },
+    check: function (state, result, input) { return result.ok && /-rm\s+-r/.test(input) && !hnode(state, hdfsPath); }
+  };
+}
+
+function stepJavac() {
+  return {
+    theory: 'The matrix program is YOUR Java code — Hadoop has no built-in jar for it. Compile it against Hadoop’s libraries by passing Hadoop’s classpath to javac.',
+    question: 'Compile MatrixMultiplication.java against the Hadoop classpath.',
+    hints: ['javac needs -classpath <hadoop’s jars> and the .java file. On Linux/Mac you can splice the classpath in with "$(hadoop classpath)".',
+      'Shape: javac -classpath "$(hadoop classpath)" -d . MatrixMultiplication.java'],
+    answer: javacCmd,
+    check: function (state) { return state.compiled; }
+  };
+}
+
+function stepJar() {
+  return {
+    theory: 'MapReduce wants ONE .jar file, not loose .class files — package everything you just compiled.',
+    question: 'Package the compiled classes into MatrixMultiplication.jar.',
+    hints: ['The jar tool with -cf <name.jar> <what to include>.', 'Shape: jar -cf MatrixMultiplication.jar *.class'],
+    answer: jarCmd,
+    check: function (state) { return state.jarBuilt; }
+  };
+}
+
+function stepRunJob(inPath, outPath) {
+  return {
+    theory: 'hadoop jar <jar> <MainClass> <input> <output> submits the job to YARN. The output directory must NOT exist yet — MapReduce refuses to overwrite.',
+    question: 'Run the job: input ' + inPath + ', output ' + outPath + '.',
+    hints: ['hadoop jar, then the jar file, then the main class name (MatrixMultiplication), then input path, then output path.',
+      'Shape: hadoop jar MatrixMultiplication.jar MatrixMultiplication ' + inPath + ' ' + outPath],
+    answer: function () { return 'hadoop jar MatrixMultiplication.jar MatrixMultiplication ' + inPath + ' ' + outPath; },
+    check: function (state) { return !!hnode(state, outPath + '/part-r-00000'); }
+  };
+}
+
+function stepReadResult(outPath) {
+  return {
+    theory: 'Reducers write files named part-r-00000, part-r-00001… A _SUCCESS marker means the job finished. For our 2×2 matrices the answer must be 19, 22, 43, 50.',
+    question: 'Read the job result from ' + outPath + '.',
+    hints: ['It is just -cat on the part file.', 'Shape: hadoop fs -cat ' + outPath + '/part-r-00000'],
+    answer: function () { return 'hadoop fs -cat ' + outPath + '/part-r-00000'; },
+    check: function (state, result, input) {
+      return result.ok && input.indexOf('-cat') !== -1 && result.output.indexOf('19') !== -1 && result.output.indexOf('50') !== -1;
+    }
+  };
+}
+
+// ---------- modules ----------
+
+var MODULES = [
+  {
+    id: 'm1',
+    title: 'Boot the cluster',
+    subtitle: 'start · jps · first look at HDFS',
+    setup: function (engine, os) { return engine.createState(os); },
+    steps: [
+      stepStart(),
+      stepJps(),
+      stepLsRoot('Found 2 items')
+    ]
+  },
+  {
+    id: 'm2',
+    title: 'HDFS commands — Lab 2',
+    subtitle: 'mkdir · put/get · cat · rm — the full lab sheet',
+    setup: function (engine, os) {
+      var s = engine.createState(os);
+      engine.runCommand(s, os === 'windows' ? 'start-all.cmd' : 'hadoop-start');
+      return s;
+    },
+    steps: [
+      stepMkdir('/dir1', '-mkdir creates a directory in HDFS — on the cluster, not on your disk.'),
+      stepLs('/', '/dir1'),
+      stepMkdir('/dir1/newdir', 'Paths nest exactly like a normal filesystem — a directory inside a directory.'),
+      stepCd(kitCd, 'The sample files live on your LOCAL disk. Local paths with SPACES break Hadoop commands — so we cd into the folder and use bare filenames.'),
+      stepPut('command3.txt', '/dir1', { theory: 'Local → HDFS is -copyFromLocal: local source first, HDFS destination second.' }),
+      stepLs('/dir1', 'command3.txt'),
+      stepLocalMkdir('downloaded'),
+      stepGet('/dir1/command3.txt', 'downloaded', { theory: 'HDFS → local is -copyToLocal — the exact mirror of -copyFromLocal.' }),
+      stepPut('exampleput.txt', '/dir1/newdir', { useAlias: true, note: '-put is EXACTLY the same command as -copyFromLocal — two names, one behaviour. The lab sheet uses both.' }),
+      stepGet('/dir1/newdir/exampleput.txt', 'downloaded', { useAlias: true, note: '-get ≡ -copyToLocal, same as put ≡ copyFromLocal.' }),
+      stepCat('/dir1/command3.txt', 'this file moves into hdfs'),
+      stepRmFile('/dir1/command3.txt', '-rm deletes a file. Directories need more (coming next).'),
+      stepRmFile('/dir1/newdir/exampleput.txt', 'To use the safe directory-delete, the directory must be empty first.'),
+      stepRmdir('/dir1/newdir'),
+      stepRmR('/dir1', 'For a directory WITH contents: -rm -r (recursive) takes everything in one go.'),
+      stepLsRoot('Found 2 items')
+    ]
+  },
+  {
+    id: 'm3',
+    title: 'Matrix multiply — Lab 3',
+    subtitle: 'compile · jar · run MapReduce · read 19/22/43/50',
+    setup: function (engine, os) {
+      var s = engine.createState(os);
+      engine.runCommand(s, os === 'windows' ? 'start-all.cmd' : 'hadoop-start');
+      return s;
+    },
+    steps: [
+      stepMkdir('/bda2', 'The job reads its input FROM HDFS — first give it a home there. (Map scatters each matrix cell to the output cells it feeds; Reduce multiplies and sums.)'),
+      {
+        theory: 'The program and matrix.txt sit on your local disk — go to them.',
+        question: 'Move into the folder holding MatrixMultiplication.java and matrix.txt.',
+        hints: ['Plain cd again.', 'Shape: cd ~/mat   (Windows: cd C:/BDA)'],
+        answer: matCd,
+        check: function (state, result, input) {
+          if (!result.ok || !/^cd\s/.test(input.trim())) return false;
+          var last = state.cwd[state.cwd.length - 1];
+          return last === 'mat' || last === 'BDA';
+        }
+      },
+      stepPut('matrix.txt', '/bda2', { theory: 'Input format: one element per line — MatrixName,row,col,value.' }),
+      stepLs('/bda2', 'matrix.txt'),
+      stepJavac(),
+      stepJar(),
+      stepRunJob('/bda2/matrix.txt', '/matrixoutput'),
+      stepReadResult('/matrixoutput')
+    ]
+  },
+  {
+    id: 'm4',
+    title: 'Extended toolbox',
+    subtitle: 'cp · mv · touchz · count · du · tail · dfsadmin — the “extra” questions',
+    setup: function (engine, os) {
+      var s = engine.createState(os);
+      engine.runCommand(s, os === 'windows' ? 'start-all.cmd' : 'hadoop-start');
+      return s;
+    },
+    steps: [
+      stepMkdir('/work', 'A scratch directory for this round — more mkdir reps never hurt.'),
+      stepCd(kitCd, 'Back to the sample files on local disk.'),
+      stepPut('command3.txt', '/work', { theory: 'One more put — by now this should be automatic.' }),
+      stepCp('/work/command3.txt', '/work/copy.txt'),
+      stepMv('/work/copy.txt', '/work/notes.txt'),
+      stepTouchz('/work/empty.txt'),
+      stepCount('/work'),
+      stepDu('/work'),
+      stepTail('/work/command3.txt', 'this file moves into hdfs'),
+      stepReport(),
+      stepVersion(),
+      stepRmR('/work', 'Always leave the cluster the way you found it — recursive cleanup.')
+    ]
+  }
+];
+
+// ---------- module 4: extended toolbox ----------
+
+function stepCp(src, dst) {
+  return {
+    theory: '-cp copies a file INSIDE HDFS — no local disk involved. Source first, destination second.',
+    question: 'Copy ' + src + ' to ' + dst + ' (both in HDFS).',
+    hints: ['Same shape as Unix cp, as an fs subcommand.', 'Shape: hadoop fs -cp ' + src + ' ' + dst],
+    answer: function () { return 'hadoop fs -cp ' + src + ' ' + dst; },
+    check: function (state) { return !!hnode(state, dst) && !!hnode(state, src); }
+  };
+}
+
+function stepMv(src, dst) {
+  return {
+    theory: '-mv moves OR renames inside HDFS — it is the same command for both, exactly like Unix mv.',
+    question: 'Rename ' + src + ' to ' + dst + '.',
+    hints: ['Move and rename are one command.', 'Shape: hadoop fs -mv ' + src + ' ' + dst],
+    answer: function () { return 'hadoop fs -mv ' + src + ' ' + dst; },
+    check: function (state) { return !!hnode(state, dst) && !hnode(state, src); }
+  };
+}
+
+function stepTouchz(path) {
+  return {
+    theory: '-touchz creates an empty (zero-byte) file — handy for markers and quick tests.',
+    question: 'Create an empty file at ' + path + '.',
+    hints: ['Like Unix touch, with a z.', 'Shape: hadoop fs -touchz ' + path],
+    answer: function () { return 'hadoop fs -touchz ' + path; },
+    check: function (state) { var n = hnode(state, path); return !!n && n.type === 'file'; }
+  };
+}
+
+function stepCount(path) {
+  return {
+    theory: '-count summarises a directory in one line: DIR_COUNT, FILE_COUNT, total bytes, path.',
+    question: 'Count the directories, files and bytes under ' + path + '.',
+    hints: ['One fs subcommand, one path.', 'Shape: hadoop fs -count ' + path],
+    answer: function () { return 'hadoop fs -count ' + path; },
+    check: function (state, result, input) { return result.ok && input.indexOf('-count') !== -1; }
+  };
+}
+
+function stepDu(path) {
+  return {
+    theory: '-du shows per-entry disk usage; add -h for human-readable sizes (K, M, G).',
+    question: 'Show the human-readable size of everything in ' + path + '.',
+    hints: ['du plus the human flag plus the path.', 'Shape: hadoop fs -du -h ' + path],
+    answer: function () { return 'hadoop fs -du -h ' + path; },
+    check: function (state, result, input) { return result.ok && input.indexOf('-du') !== -1; }
+  };
+}
+
+function stepTail(path, fragment) {
+  return {
+    theory: 'Job outputs can be huge — -tail prints only the last kilobyte, so you can peek without flooding the screen.',
+    question: 'Show the tail end of ' + path + '.',
+    hints: ['Like Unix tail.', 'Shape: hadoop fs -tail ' + path],
+    answer: function () { return 'hadoop fs -tail ' + path; },
+    check: function (state, result, input) { return result.ok && input.indexOf('-tail') !== -1 && result.output.indexOf(fragment) !== -1; }
+  };
+}
+
+function stepReport() {
+  return {
+    theory: 'hdfs dfsadmin -report is the admin health check: capacity, usage, and every live DataNode. If the lab examiner asks “is your cluster healthy?”, this is the answer.',
+    question: 'Print the cluster health report.',
+    hints: ['It is a dfsadmin subcommand, not fs.', 'Shape: hdfs dfsadmin -report'],
+    answer: function () { return 'hdfs dfsadmin -report'; },
+    check: function (state, result, input) { return result.ok && input.indexOf('dfsadmin') !== -1 && input.indexOf('-report') !== -1; }
+  };
+}
+
+function stepVersion() {
+  return {
+    theory: 'Know your version: Hadoop 3.x uses web UI port 9870 — old manuals say 50070, which is 2.x. Version mismatches are the #1 source of “why doesn’t my machine match the manual”.',
+    question: 'Print which Hadoop version you are running.',
+    hints: ['Plain hadoop subcommand, no dash.', 'Shape: hadoop version'],
+    answer: function () { return 'hadoop version'; },
+    check: function (state, result, input) { return result.ok && /^hadoop\s+version$/.test(input.trim()); }
+  };
+}
+
+// ---------- recap rounds (same command families, fresh paths, no theory) ----------
+
+function stripTheory(step) {
+  var s = {};
+  for (var k in step) s[k] = step[k];
+  delete s.theory;
+  return s;
+}
+
+function buildRecap(module) {
+  var steps;
+  if (module.id === 'm1') {
+    steps = [stepStart(), stepJps(), stepLsRoot(null)];
+  } else if (module.id === 'm2') {
+    steps = [
+      stepMkdir('/college'),
+      stepMkdir('/college/notes'),
+      stepCd(kitCd),
+      stepPut('command3.txt', '/college'),
+      stepLs('/college', 'command3.txt'),
+      stepLocalMkdir('backup'),
+      stepGet('/college/command3.txt', 'backup'),
+      stepPut('exampleput.txt', '/college/notes', { useAlias: true }),
+      stepCat('/college/command3.txt', 'this file moves into hdfs'),
+      stepRmFile('/college/notes/exampleput.txt'),
+      stepRmdir('/college/notes'),
+      stepRmR('/college')
+    ];
+  } else if (module.id === 'm4') {
+    steps = [
+      stepMkdir('/extra'),
+      stepCd(kitCd),
+      stepPut('exampleput.txt', '/extra', { useAlias: true }),
+      stepCp('/extra/exampleput.txt', '/extra/twin.txt'),
+      stepMv('/extra/twin.txt', '/extra/final.txt'),
+      stepTouchz('/extra/marker.txt'),
+      stepCount('/extra'),
+      stepDu('/extra'),
+      stepTail('/extra/exampleput.txt', 'uploaded with put'),
+      stepReport(),
+      stepVersion(),
+      stepRmR('/extra')
+    ];
+  } else {
+    steps = [
+      stepMkdir('/bda3'),
+      { question: 'Move into the folder holding the matrix files.', hints: ['cd again.', 'Shape: cd ~/mat   (Windows: cd C:/BDA)'], answer: matCd,
+        check: function (state, result, input) { if (!result.ok || !/^cd\s/.test(input.trim())) return false; var last = state.cwd[state.cwd.length - 1]; return last === 'mat' || last === 'BDA'; } },
+      stepPut('matrix.txt', '/bda3'),
+      stepJavac(),
+      stepJar(),
+      stepRunJob('/bda3/matrix.txt', '/matrixout2'),
+      stepReadResult('/matrixout2')
+    ];
+  }
+  return steps.map(stripTheory);
+}
+
+// ---------- exam (full run, fresh cluster, no theory/hints until 2 fails) ----------
+
+function buildExam() {
+  var steps = [
+    stepStart(), stepJps(), stepLsRoot('Found 2 items'),
+    stepMkdir('/final'),
+    stepCd(kitCd),
+    stepPut('command3.txt', '/final'),
+    stepLs('/final', 'command3.txt'),
+    stepLocalMkdir('examout'),
+    stepGet('/final/command3.txt', 'examout', { useAlias: true }),
+    stepCat('/final/command3.txt', 'this file moves into hdfs'),
+    stepRmFile('/final/command3.txt'),
+    stepRmR('/final'),
+    stepMkdir('/bda2'),
+    { question: 'Move into the matrix folder.', hints: ['cd.', 'Shape: cd ~/mat   (Windows: cd C:/BDA)'], answer: matCd,
+      check: function (state, result, input) { if (!result.ok || !/^cd\s/.test(input.trim())) return false; var last = state.cwd[state.cwd.length - 1]; return last === 'mat' || last === 'BDA'; } },
+    stepPut('matrix.txt', '/bda2'),
+    stepJavac(),
+    stepJar(),
+    stepRunJob('/bda2/matrix.txt', '/matrixoutput'),
+    stepReadResult('/matrixoutput')
+  ].map(stripTheory);
+  for (var i = 0; i < steps.length; i++) steps[i].examMode = true;
+  return steps;
+}
+
+function examSetup(engine, os) { return engine.createState(os); }
+
+var api = { MODULES: MODULES, buildRecap: buildRecap, buildExam: buildExam, examSetup: examSetup };
+root.BDALLessons = api;
+if (typeof module !== 'undefined' && module.exports) module.exports = api;
+
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+</script>
+<script>
+/* BDAL Playground — UI layer. Depends on BDALEngine + BDALLessons globals. */
+(function () {
+'use strict';
+
+var engine = window.BDALEngine;
+var lessons = window.BDALLessons;
+var app = document.getElementById('app');
+
+var OS_META = {
+  linux: { name: 'Linux / WSL2', detail: 'Ubuntu, EndeavourOS, or WSL2 inside Windows', cmd: 'hadoop-start' },
+  mac: { name: 'macOS', detail: 'Apple Silicon or Intel', cmd: 'hadoop-start' },
+  windows: { name: 'Windows (native)', detail: 'Hadoop + winutils, the teacher-manual way', cmd: 'start-all.cmd' }
+};
+
+// ---------- persistence ----------
+
+function loadJSON(key, fallback) {
+  try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+  catch (e) { return fallback; }
+}
+function saveJSON(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* private mode */ }
+}
+function getOS() { return loadJSON('bdalp.os', null); }
+function setOS(os) { saveJSON('bdalp.os', os); }
+function getProgress() {
+  var os = getOS();
+  var all = loadJSON('bdalp.progress', {});
+  return all[os] || { m1: {}, m2: {}, m3: {}, examBest: null };
+}
+function setProgress(p) {
+  var os = getOS();
+  var all = loadJSON('bdalp.progress', {});
+  all[os] = p;
+  saveJSON('bdalp.progress', all);
+}
+
+// ---------- tiny dom helpers ----------
+
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function md(s) { // backtick -> code
+  return esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
+function promptFor(state) {
+  if (state.os === 'windows') return engine.cwdString(state) + '>';
+  return 'student@' + (state.os === 'mac' ? 'mac' : 'linux') + ':' + engine.cwdString(state) + '$ ';
+}
+
+// ---------- header ----------
+
+function headerHTML() {
+  var os = getOS();
+  return '<header class="top">' +
+    '<button class="brand" id="go-home">bdal-playground<span class="tail">$ _</span></button>' +
+    (os ? '<button class="oschip" id="switch-os" title="Switch operating system">' + esc(OS_META[os].name) + ' ⇄</button>' : '') +
+    '</header>';
+}
+
+function bindHeader() {
+  var home = document.getElementById('go-home');
+  if (home) home.onclick = function () { renderHome(); };
+  var sw = document.getElementById('switch-os');
+  if (sw) sw.onclick = function () { renderOSPicker(); };
+}
+
+// ---------- screens ----------
+
+function renderOSPicker() {
+  var cards = Object.keys(OS_META).map(function (os) {
+    var m = OS_META[os];
+    return '<button class="oscard" data-os="' + os + '">' +
+      '<span class="osname">' + esc(m.name) + '</span>' +
+      '<span class="osdetail">' + esc(m.detail) + '</span>' +
+      '<span class="oscmd">cluster starts with: ' + esc(m.cmd) + '</span>' +
+      '</button>';
+  }).join('');
+  app.innerHTML = headerHTML() +
+    '<div class="hero">' +
+    '<h1>Learn the lab by typing it.<span class="cursor"></span></h1>' +
+    '<p>A simulated Hadoop terminal for the BDAL labs — cluster startup, HDFS commands (Lab&nbsp;2) and MapReduce matrix multiplication (Lab&nbsp;3). Short theory, then you type every command yourself. Nothing to install.</p>' +
+    '<p><strong>First: which machine will you sit at tomorrow?</strong></p>' +
+    '</div>' +
+    '<div class="oslist">' + cards + '</div>';
+  bindHeader();
+  Array.prototype.forEach.call(document.querySelectorAll('.oscard'), function (el) {
+    el.onclick = function () { setOS(el.getAttribute('data-os')); renderHome(); };
+  });
+}
+
+function modStatus(p, id) {
+  var st = p[id] || {};
+  if (st.recap) return '<span class="done">✓ guided + recap done</span>';
+  if (st.guided) return '<span class="done">✓ guided done</span> · recap open';
+  return '';
+}
+
+function renderHome() {
+  if (!getOS()) return renderOSPicker();
+  var p = getProgress();
+  var mods = lessons.MODULES.map(function (m, i) {
+    var st = p[m.id] || {};
+    return '<div class="modcard">' +
+      '<span class="modnum">module ' + (i + 1) + '</span>' +
+      '<h2>' + esc(m.title) + '</h2>' +
+      '<p class="sub">' + esc(m.subtitle) + '  ' + modStatus(p, m.id) + '</p>' +
+      '<div class="btnrow">' +
+      '<button class="btn" data-run="guided" data-mod="' + i + '">' + (st.guided ? 'Redo guided' : 'Start guided') + '</button>' +
+      '<button class="btn ghost" data-run="recap" data-mod="' + i + '" ' + (st.guided ? '' : 'disabled') + '>Recap round</button>' +
+      '</div>' +
+      (st.guided ? '' : '<p class="lockhint">Recap unlocks after the guided run — same commands, new paths, no theory.</p>') +
+      '</div>';
+  }).join('');
+  var allRecaps = ['m1', 'm2', 'm3'].every(function (id) { return (p[id] || {}).recap; });
+  var exam = '<div class="modcard">' +
+    '<span class="modnum">final</span>' +
+    '<h2>Exam mode</h2>' +
+    '<p class="sub">Lab 2 + Lab 3 start to finish, fresh cluster, no theory. Hints only after two misses.' +
+    (p.examBest != null ? '  <span class="done">best: ' + p.examBest + '%</span>' : '') + '</p>' +
+    '<div class="btnrow"><button class="btn" id="run-exam" ' + (allRecaps ? '' : 'disabled') + '>Start exam</button></div>' +
+    (allRecaps ? '' : '<p class="lockhint">Unlocks when the recap rounds of modules 1–3 are done. (Module 4 is bonus material.)</p>') +
+    '</div>';
+  var sandbox = '<div class="modcard">' +
+    '<span class="modnum">free play</span>' +
+    '<h2>Sandbox</h2>' +
+    '<p class="sub">An open simulated terminal — same cluster, no questions. Try anything.</p>' +
+    '<div class="btnrow"><button class="btn ghost" id="run-sandbox">Open sandbox</button></div>' +
+    '</div>';
+  app.innerHTML = headerHTML() +
+    '<div class="modlist">' + mods + exam + sandbox + '</div>' +
+    '<div class="footer">Simulator for practice — commands behave like the real lab, output is faithful but canned. ' +
+    'Companion to the <a href="https://github.com/shinzuu/hadoop-bdal-lab-kit">hadoop-bdal-lab-kit</a>. ' +
+    'Matrix program credit: <a href="https://github.com/hossain-tamim/big_data_analytics_lab">hossain-tamim</a>. ' +
+    '<button id="reset-progress">Reset progress</button></div>';
+  bindHeader();
+  Array.prototype.forEach.call(document.querySelectorAll('[data-run]'), function (el) {
+    el.onclick = function () {
+      var m = lessons.MODULES[parseInt(el.getAttribute('data-mod'), 10)];
+      startRun(el.getAttribute('data-run'), m);
+    };
+  });
+  var ex = document.getElementById('run-exam');
+  if (ex) ex.onclick = function () { if (!ex.disabled) startRun('exam', null); };
+  document.getElementById('run-sandbox').onclick = function () { startRun('sandbox', null); };
+  document.getElementById('reset-progress').onclick = function () {
+    if (confirm('Clear all progress for every OS?')) { localStorage.removeItem('bdalp.progress'); renderHome(); }
+  };
+}
+
+// ---------- run (guided / recap / exam / sandbox) ----------
+
+var session = null;
+
+function startRun(kind, mod) {
+  var os = getOS();
+  var state, steps, title;
+  if (kind === 'guided') { state = mod.setup(engine, os); steps = mod.steps; title = mod.title; }
+  else if (kind === 'recap') { state = mod.setup(engine, os); steps = lessons.buildRecap(mod); title = mod.title + ' — recap'; }
+  else if (kind === 'exam') { state = lessons.examSetup(engine, os); steps = lessons.buildExam(); title = 'Exam mode'; }
+  else { state = engine.createState(os); steps = []; title = 'Sandbox'; }
+  session = {
+    kind: kind, mod: mod, steps: steps, i: 0, state: state, title: title,
+    attempts: 0, hintLevel: 0, firstTry: 0, lines: []
+  };
+  if (kind === 'sandbox') {
+    session.lines.push({ cls: 'out', text: 'Free play. The cluster is NOT running yet — you know what to do.\nType commands like in the real lab. (This is a simulator; nothing can break.)' });
+  }
+  renderStep();
+}
+
+function currentStep() { return session.steps[session.i]; }
+
+function scrollbackHTML() {
+  return session.lines.map(function (l) {
+    if (l.cls === 'in') return '<div class="in"><span class="pr">' + esc(l.prompt) + '</span>' + esc(l.text) + '</div>';
+    return '<div class="' + l.cls + '">' + esc(l.text) + '</div>';
+  }).join('');
+}
+
+function renderStep() {
+  var s = session;
+  var step = currentStep();
+  var os = getOS();
+  var total = s.steps.length;
+  var isSandbox = s.kind === 'sandbox';
+  var pct = total ? Math.round((s.i / total) * 100) : 0;
+
+  var head = '<div class="runhead"><span class="runtitle">' + esc(s.title) + '</span>' +
+    (isSandbox ? '' : '<span class="count">step ' + (s.i + 1) + ' / ' + total + '</span>') + '</div>' +
+    (isSandbox ? '' : '<div class="bar"><div style="width:' + pct + '%"></div></div>');
+
+  var body = '';
+  if (!isSandbox && step) {
+    if (step.theory) body += '<div class="theory">' + md(step.theory) + '</div>';
+    if (step.note) body += '<div class="note">' + md(step.note) + '</div>';
+    body += '<p class="question"><span class="qlabel">your task</span>' + md(step.question) + '</p>';
+  }
+
+  var hintHTML = '';
+  if (!isSandbox && step && s.hintLevel > 0) {
+    var h = s.hintLevel === 1 ? step.hints[0]
+      : s.hintLevel === 2 ? step.hints[1]
+      : 'Answer: `' + step.answer(os) + '` — now type it yourself.';
+    hintHTML = '<div class="hintbox">' + md(h) + '</div>';
+  }
+
+  var hintBtn = '';
+  if (!isSandbox && step) {
+    var locked = step.examMode && s.attempts < 2 && s.hintLevel === 0;
+    var label = s.hintLevel === 0 ? 'Hint' : s.hintLevel === 1 ? 'Another hint' : s.hintLevel === 2 ? 'Reveal answer' : 'Answer shown';
+    hintBtn = '<div class="stepactions">' +
+      '<button class="btn ghost" id="hint-btn" ' + ((locked || s.hintLevel >= 3) ? 'disabled' : '') + '>' +
+      (locked ? 'Hints after 2 tries (exam!)' : label) + '</button>' +
+      '<button class="btn ghost" id="quit-btn">Exit</button>' +
+      '<span class="tally">' + (s.attempts ? 'attempts: ' + s.attempts : '') + '</span>' +
+      '</div>';
+  } else {
+    hintBtn = '<div class="stepactions"><button class="btn ghost" id="quit-btn">Back to menu</button></div>';
+  }
+
+  app.innerHTML = headerHTML() + head + body +
+    '<div class="term">' +
+    '<div class="tbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>' +
+    '<span class="tname">simulated ' + esc(OS_META[os].name) + ' terminal</span></div>' +
+    '<div class="scrollback" id="scrollback">' + scrollbackHTML() + '</div>' +
+    '<div class="inline-input"><span class="pr" id="pr"></span>' +
+    '<input id="cmd" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" ' +
+    'aria-label="Type a command and press Enter" placeholder="type the command, press Enter"></div>' +
+    '</div>' +
+    hintHTML + hintBtn;
+
+  bindHeader();
+  document.getElementById('pr').textContent = promptFor(s.state);
+  var input = document.getElementById('cmd');
+  input.focus();
+  var sb = document.getElementById('scrollback');
+  sb.scrollTop = sb.scrollHeight;
+
+  var hb = document.getElementById('hint-btn');
+  if (hb) hb.onclick = function () { s.hintLevel = Math.min(s.hintLevel + 1, 3); renderStep(); };
+  document.getElementById('quit-btn').onclick = function () { session = null; renderHome(); };
+
+  var hist = s.history || (s.history = []);
+  var hi = hist.length;
+  input.onkeydown = function (e) {
+    if (e.key === 'ArrowUp') { if (hi > 0) { hi--; input.value = hist[hi]; } e.preventDefault(); }
+    else if (e.key === 'ArrowDown') { if (hi < hist.length - 1) { hi++; input.value = hist[hi]; } else { hi = hist.length; input.value = ''; } e.preventDefault(); }
+    else if (e.key === 'Enter') {
+      var cmd = input.value.trim();
+      if (!cmd) return;
+      hist.push(cmd); hi = hist.length;
+      submit(cmd);
+    }
+  };
+}
+
+function submit(cmd) {
+  var s = session;
+  var step = currentStep();
+  s.lines.push({ cls: 'in', prompt: promptFor(s.state), text: cmd });
+  var result = engine.runCommand(s.state, cmd);
+  if (result.output) s.lines.push({ cls: result.ok ? 'out' : 'bad', text: result.output });
+
+  if (s.kind === 'sandbox' || !step) { renderStep(); return; }
+
+  if (step.check(s.state, result, cmd)) {
+    if (s.attempts === 0 && s.hintLevel === 0) s.firstTry++;
+    s.lines.push({ cls: 'good', text: '✓ correct — ' + step.answer(getOS()) });
+    s.i++; s.attempts = 0; s.hintLevel = 0;
+    if (s.i >= s.steps.length) { finishRun(); return; }
+    renderStep();
+  } else {
+    s.attempts++;
+    if (result.ok) s.lines.push({ cls: 'bad', text: '✗ that ran, but it isn’t what the task asked — check the task again' + (s.attempts >= 2 ? ' (or take a hint)' : '') });
+    renderStep();
+  }
+}
+
+function finishRun() {
+  var s = session;
+  var p = getProgress();
+  var scorePct = Math.round((s.firstTry / s.steps.length) * 100);
+  var html;
+  if (s.kind === 'guided') {
+    p[s.mod.id] = p[s.mod.id] || {}; p[s.mod.id].guided = true; setProgress(p);
+    html = '<h2>Module complete ✓</h2><p>' + s.firstTry + ' of ' + s.steps.length + ' first try.</p>' +
+      '<p>Now do the <strong>recap round</strong> — same commands, new paths, from memory.</p>' +
+      '<div class="btnrow" style="justify-content:center"><button class="btn" id="next-recap">Start recap</button>' +
+      '<button class="btn ghost" id="back-home">Menu</button></div>';
+  } else if (s.kind === 'recap') {
+    p[s.mod.id] = p[s.mod.id] || {}; p[s.mod.id].recap = true; setProgress(p);
+    html = '<h2>Recap done ✓</h2><p>' + s.firstTry + ' of ' + s.steps.length + ' first try. These commands are getting into your fingers.</p>' +
+      '<div class="btnrow" style="justify-content:center"><button class="btn ghost" id="back-home">Menu</button></div>';
+  } else { // exam
+    if (p.examBest == null || scorePct > p.examBest) p.examBest = scorePct;
+    setProgress(p);
+    html = '<h2>Exam finished</h2><div class="big">' + scorePct + '%</div>' +
+      '<p>' + s.firstTry + ' of ' + s.steps.length + ' on the first try' +
+      (scorePct >= 80 ? ' — you are ready for tomorrow.' : ' — run it again; repetition is the whole point.') + '</p>' +
+      '<div class="btnrow" style="justify-content:center"><button class="btn" id="redo-exam">Run it again</button>' +
+      '<button class="btn ghost" id="back-home">Menu</button></div>';
+  }
+  var mod = s.mod;
+  session = null;
+  app.innerHTML = headerHTML() + '<div class="summary">' + html + '</div>';
+  bindHeader();
+  var bh = document.getElementById('back-home');
+  if (bh) bh.onclick = function () { renderHome(); };
+  var nr = document.getElementById('next-recap');
+  if (nr) nr.onclick = function () { startRun('recap', mod); };
+  var re = document.getElementById('redo-exam');
+  if (re) re.onclick = function () { startRun('exam', null); };
+}
+
+// ---------- ?test=1 smoke suite ----------
+
+function runSmokeTests() {
+  var out = [];
+  var pass = 0, fail = 0;
+  ['linux', 'mac', 'windows'].forEach(function (os) {
+    lessons.MODULES.forEach(function (m) {
+      var state = m.setup(engine, os);
+      m.steps.forEach(function (step, i) {
+        var input = step.answer(os);
+        var result = engine.runCommand(state, input);
+        var okk = false;
+        try { okk = step.check(state, result, input); } catch (e) { okk = false; }
+        if (okk) { pass++; } else { fail++; out.push('<span class="f">FAIL ' + os + ' ' + m.id + ' step ' + i + ': ' + esc(input) + '</span>'); }
+      });
+    });
+    var ex = lessons.examSetup(engine, os);
+    lessons.buildExam().forEach(function (step, i) {
+      var input = step.answer(os);
+      var result = engine.runCommand(ex, input);
+      if (step.check(ex, result, input)) pass++; else { fail++; out.push('<span class="f">FAIL ' + os + ' exam step ' + i + '</span>'); }
+    });
+  });
+  out.unshift('<span class="' + (fail ? 'f' : 'p') + '">' + pass + ' passed, ' + fail + ' failed</span>');
+  app.innerHTML = headerHTML() + '<div class="testlog">' + out.join('\n') + '</div>';
+  bindHeader();
+  console.log('[bdalp smoke] pass=' + pass + ' fail=' + fail);
+}
+
+// ---------- boot ----------
+
+if (location.search.indexOf('test=1') !== -1) runSmokeTests();
+else if (getOS()) renderHome();
+else renderOSPicker();
+
+})();
+
+</script>
+</body>
+</html>

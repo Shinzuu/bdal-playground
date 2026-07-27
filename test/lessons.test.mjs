@@ -67,4 +67,19 @@ test('repetition audit: every core command family appears >= 3 times overall', (
     const n = answers.filter(match).length;
     assert.ok(n >= 3, `family "${name}" appears ${n}x, need >= 3`);
   }
+  // extended families live in module 4 guided + recap only
+  const extended = {
+    cp: a => /fs -cp\b/.test(a),
+    mv: a => /fs -mv\b/.test(a),
+    touchz: a => /-touchz\b/.test(a),
+    count: a => /-count\b/.test(a),
+    du: a => /-du\b/.test(a),
+    tail: a => /-tail\b/.test(a),
+    report: a => /dfsadmin -report/.test(a),
+    version: a => /^hadoop version$/.test(a)
+  };
+  for (const [name, match] of Object.entries(extended)) {
+    const n = answers.filter(match).length;
+    assert.ok(n >= 2, `extended family "${name}" appears ${n}x, need >= 2`);
+  }
 });
