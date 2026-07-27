@@ -196,6 +196,12 @@ function renderStep() {
     if (step.theory) body += '<div class="theory">' + md(step.theory) + '</div>';
     if (step.note) body += '<div class="note">' + md(step.note) + '</div>';
     body += '<p class="question"><span class="qlabel">your task</span>' + md(step.question) + '</p>';
+    if (step.anatomy) {
+      var rows = step.anatomy(os).map(function (r) {
+        return '<div class="arow"><code>' + esc(r[0]) + '</code><span>' + esc(r[1]) + '</span></div>';
+      }).join('');
+      body += '<div class="anatomy"><div class="alabel">build it word by word — then type the whole thing</div>' + rows + '</div>';
+    }
   }
 
   var hintHTML = '';
@@ -213,6 +219,7 @@ function renderStep() {
     hintBtn = '<div class="stepactions">' +
       '<button class="btn ghost" id="hint-btn" ' + ((locked || s.hintLevel >= 3) ? 'disabled' : '') + '>' +
       (locked ? 'Hints after 2 tries (exam!)' : label) + '</button>' +
+      '<button class="btn ghost" id="skip-btn" title="Show the answer and move on">Skip →</button>' +
       '<button class="btn ghost" id="quit-btn">Exit</button>' +
       '<span class="tally">' + (s.attempts ? 'attempts: ' + s.attempts : '') + '</span>' +
       '</div>';
@@ -240,6 +247,20 @@ function renderStep() {
 
   var hb = document.getElementById('hint-btn');
   if (hb) hb.onclick = function () { s.hintLevel = Math.min(s.hintLevel + 1, 3); renderStep(); };
+  var sk = document.getElementById('skip-btn');
+  if (sk) sk.onclick = function () {
+    var st = currentStep();
+    var ans = st.answer(getOS());
+    // run the canonical answer so later steps still line up
+    s.lines.push({ cls: 'in', prompt: promptFor(s.state), text: ans });
+    var result = engine.runCommand(s.state, ans);
+    if (result.output) s.lines.push({ cls: result.ok ? 'out' : 'bad', text: result.output });
+    s.lines.push({ cls: 'bad', text: '↷ skipped — the answer (run for you): ' + ans });
+    s.skipped = (s.skipped || 0) + 1;
+    s.i++; s.attempts = 0; s.hintLevel = 0;
+    if (s.i >= s.steps.length) { finishRun(); return; }
+    renderStep();
+  };
   document.getElementById('quit-btn').onclick = function () { session = null; renderHome(); };
 
   var hist = s.history || (s.history = []);
@@ -282,22 +303,23 @@ function finishRun() {
   var s = session;
   var p = getProgress();
   var scorePct = Math.round((s.firstTry / s.steps.length) * 100);
+  var skippedNote = s.skipped ? ' (' + s.skipped + ' skipped — worth redoing those)' : '';
   var html;
   if (s.kind === 'guided') {
     p[s.mod.id] = p[s.mod.id] || {}; p[s.mod.id].guided = true; setProgress(p);
-    html = '<h2>Module complete ✓</h2><p>' + s.firstTry + ' of ' + s.steps.length + ' first try.</p>' +
+    html = '<h2>Module complete ✓</h2><p>' + s.firstTry + ' of ' + s.steps.length + ' first try' + skippedNote + '.</p>' +
       '<p>Now do the <strong>recap round</strong> — same commands, new paths, from memory.</p>' +
       '<div class="btnrow" style="justify-content:center"><button class="btn" id="next-recap">Start recap</button>' +
       '<button class="btn ghost" id="back-home">Menu</button></div>';
   } else if (s.kind === 'recap') {
     p[s.mod.id] = p[s.mod.id] || {}; p[s.mod.id].recap = true; setProgress(p);
-    html = '<h2>Recap done ✓</h2><p>' + s.firstTry + ' of ' + s.steps.length + ' first try. These commands are getting into your fingers.</p>' +
+    html = '<h2>Recap done ✓</h2><p>' + s.firstTry + ' of ' + s.steps.length + ' first try' + skippedNote + '. These commands are getting into your fingers.</p>' +
       '<div class="btnrow" style="justify-content:center"><button class="btn ghost" id="back-home">Menu</button></div>';
   } else { // exam
     if (p.examBest == null || scorePct > p.examBest) p.examBest = scorePct;
     setProgress(p);
     html = '<h2>Exam finished</h2><div class="big">' + scorePct + '%</div>' +
-      '<p>' + s.firstTry + ' of ' + s.steps.length + ' on the first try' +
+      '<p>' + s.firstTry + ' of ' + s.steps.length + ' on the first try' + skippedNote +
       (scorePct >= 80 ? ' — you are ready for tomorrow.' : ' — run it again; repetition is the whole point.') + '</p>' +
       '<div class="btnrow" style="justify-content:center"><button class="btn" id="redo-exam">Run it again</button>' +
       '<button class="btn ghost" id="back-home">Menu</button></div>';

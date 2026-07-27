@@ -54,6 +54,9 @@ function stepStart() {
     hints: ['One short command starts everything. On Linux/Mac it is a hyphenated word; on Windows it is a .cmd script.',
       'It begins with “start” on Windows, and with “hadoop-” on Linux/Mac.'],
     answer: startCmd,
+    anatomy: function (os) {
+      return [[startCmd(os), 'one script that starts every daemon at once (its twin, ' + (os === 'windows' ? 'stop-all.cmd' : 'hadoop-stop') + ', stops them)']];
+    },
     check: function (state) { return state.clusterUp; }
   };
 }
@@ -64,6 +67,7 @@ function stepJps() {
     question: 'Verify the cluster daemons are actually running.',
     hints: ['It is a 3-letter command: Java Process Status.', 'Just type the three letters.'],
     answer: function () { return 'jps'; },
+    anatomy: function () { return [['jps', 'Java Process Status — lists every running Java daemon with its process id']]; },
     check: function (state, result, input) { return result.ok && /^jps$/.test(input.trim()); }
   };
 }
@@ -74,6 +78,11 @@ function stepLsRoot(expectText) {
     question: 'List the ROOT directory of HDFS.',
     hints: ['hadoop fs -ls needs a path; the HDFS root is “/”.', 'Shape: hadoop fs -ls <path>  — the root path is a single slash.'],
     answer: function () { return 'hadoop fs -ls /'; },
+    anatomy: function () {
+      return [['hadoop fs', 'talk to HDFS (not your normal disk)'],
+        ['-ls', 'list a directory'],
+        ['/', 'which one — a single slash is the HDFS root']];
+    },
     check: function (state, result, input) {
       return result.ok && /-ls\s+\/\s*$/.test(input) && (!expectText || result.output.indexOf(expectText) !== -1);
     }
@@ -86,6 +95,11 @@ function stepMkdir(path, theory) {
     question: 'Create the directory ' + path + ' in HDFS.',
     hints: ['The fs subcommand is -mkdir, and HDFS paths start at “/”.', 'Shape: hadoop fs -mkdir ' + path],
     answer: function () { return 'hadoop fs -mkdir ' + path; },
+    anatomy: function () {
+      return [['hadoop fs', 'talk to HDFS'],
+        ['-mkdir', 'make a directory'],
+        [path, 'where to make it (leading / = from the HDFS root)']];
+    },
     check: function (state) { var n = hnode(state, path); return !!n && n.type === 'dir'; }
   };
 }
@@ -95,6 +109,9 @@ function stepLs(path, mustContain) {
     question: 'List ' + path + ' to confirm.',
     hints: ['Same -ls as before, different path.', 'Shape: hadoop fs -ls ' + path],
     answer: function () { return 'hadoop fs -ls ' + path; },
+    anatomy: function () {
+      return [['hadoop fs', 'talk to HDFS'], ['-ls', 'list a directory'], [path, 'the directory to look inside']];
+    },
     check: function (state, result, input) {
       return result.ok && input.indexOf('-ls') !== -1 && result.output.indexOf(mustContain) !== -1;
     }
@@ -107,6 +124,10 @@ function stepCd(cdCmd, theory) {
     question: 'Move into the folder that holds the sample files.',
     hints: ['Plain shell cd — no hadoop involved.', 'Shape: ' + cdCmd('linux') + '   (Windows: ' + cdCmd('windows') + ')'],
     answer: cdCmd,
+    anatomy: function (os) {
+      return [['cd', 'change directory — plain shell, no hadoop'],
+        [cdCmd(os).slice(3), 'the local folder holding the sample files']];
+    },
     check: function (state, result, input) {
       if (!result.ok || !/^cd\s/.test(input.trim())) return false;
       var last = state.cwd[state.cwd.length - 1];
@@ -125,6 +146,12 @@ function stepPut(fileName, hdfsDir, opts) {
     hints: ['Local → HDFS is -copyFromLocal (or its alias -put). Arguments: local source first, HDFS destination second.',
       'Shape: hadoop fs ' + verb + ' ' + fileName + ' ' + hdfsDir + '   (Windows: give the full C:/… path to the file)'],
     answer: function (os) { return 'hadoop fs ' + verb + ' ' + localRef(os, fileName) + ' ' + hdfsDir; },
+    anatomy: function (os) {
+      return [['hadoop fs', 'talk to HDFS'],
+        [verb, 'copy local \u2192 HDFS' + (opts.useAlias ? ' (alias of -copyFromLocal)' : ' (alias: -put)')],
+        [localRef(os, fileName), 'SOURCE: the file on your disk'],
+        [hdfsDir, 'DESTINATION: a directory in HDFS']];
+    },
     check: function (state) { var n = hnode(state, hdfsDir + '/' + fileName); return !!n && n.type === 'file'; }
   };
 }
@@ -135,6 +162,12 @@ function stepLocalMkdir(dirName) {
     question: 'Create a LOCAL folder called ' + dirName + ' (in your current directory).',
     hints: ['Plain shell mkdir, not hadoop fs.', 'Shape: mkdir -p ' + dirName],
     answer: function (os) { return isWin(os) ? 'mkdir ' + dirName : 'mkdir -p ' + dirName; },
+    anatomy: function (os) {
+      var rows = [['mkdir', 'make a LOCAL folder (your disk, not HDFS)']];
+      if (!isWin(os)) rows.push(['-p', 'no complaint if it already exists']);
+      rows.push([dirName, 'the folder name']);
+      return rows;
+    },
     check: function (state) { return cwdHas(state, dirName); }
   };
 }
@@ -150,6 +183,12 @@ function stepGet(hdfsPath, localDir, opts) {
     hints: ['HDFS → local is -copyToLocal (or its alias -get). HDFS source first, local destination second — the mirror image of put.',
       'Shape: hadoop fs ' + verb + ' ' + hdfsPath + ' ' + localDir + '/'],
     answer: function () { return 'hadoop fs ' + verb + ' ' + hdfsPath + ' ' + localDir + '/'; },
+    anatomy: function () {
+      return [['hadoop fs', 'talk to HDFS'],
+        [verb, 'copy HDFS \u2192 local' + (opts.useAlias ? ' (alias of -copyToLocal)' : ' (alias: -get)')],
+        [hdfsPath, 'SOURCE: the file in HDFS'],
+        [localDir + '/', 'DESTINATION: your local folder']];
+    },
     check: function (state) {
       return cwdHas(state, localDir) && !!lnode(state, state.cwd.concat([localDir, fname]));
     }
@@ -162,6 +201,9 @@ function stepCat(hdfsPath, contentFragment) {
     question: 'Show the contents of ' + hdfsPath + '.',
     hints: ['Same idea as Unix cat, but as an fs subcommand.', 'Shape: hadoop fs -cat ' + hdfsPath],
     answer: function () { return 'hadoop fs -cat ' + hdfsPath; },
+    anatomy: function () {
+      return [['hadoop fs', 'talk to HDFS'], ['-cat', 'print a file\u2019s contents'], [hdfsPath, 'the file to read']];
+    },
     check: function (state, result, input) {
       return result.ok && input.indexOf('-cat') !== -1 && result.output.indexOf(contentFragment) !== -1;
     }
@@ -174,6 +216,9 @@ function stepRmFile(hdfsPath, theory) {
     question: 'Delete the FILE ' + hdfsPath + ' from HDFS.',
     hints: ['-rm deletes files (it refuses directories without -r).', 'Shape: hadoop fs -rm ' + hdfsPath],
     answer: function () { return 'hadoop fs -rm ' + hdfsPath; },
+    anatomy: function () {
+      return [['hadoop fs', 'talk to HDFS'], ['-rm', 'delete a FILE (refuses directories)'], [hdfsPath, 'the file to delete']];
+    },
     check: function (state, result, input) { return result.ok && input.indexOf('-rm') !== -1 && !hnode(state, hdfsPath); }
   };
 }
@@ -184,6 +229,9 @@ function stepRmdir(hdfsPath) {
     question: 'Remove the now-empty directory ' + hdfsPath + '.',
     hints: ['Not -rm this time — the empty-only variant.', 'Shape: hadoop fs -rmdir ' + hdfsPath],
     answer: function () { return 'hadoop fs -rmdir ' + hdfsPath; },
+    anatomy: function () {
+      return [['hadoop fs', 'talk to HDFS'], ['-rmdir', 'delete a directory ONLY if empty'], [hdfsPath, 'the empty directory']];
+    },
     check: function (state, result, input) { return result.ok && input.indexOf('-rmdir') !== -1 && !hnode(state, hdfsPath); }
   };
 }
@@ -194,6 +242,9 @@ function stepRmR(hdfsPath, theory) {
     question: 'Delete ' + hdfsPath + ' and EVERYTHING inside it, in one command.',
     hints: ['-rm plus the recursive flag.', 'Shape: hadoop fs -rm -r ' + hdfsPath],
     answer: function () { return 'hadoop fs -rm -r ' + hdfsPath; },
+    anatomy: function () {
+      return [['hadoop fs', 'talk to HDFS'], ['-rm', 'delete'], ['-r', 'recursive: the directory AND everything inside'], [hdfsPath, 'what to wipe']];
+    },
     check: function (state, result, input) { return result.ok && /-rm\s+-r/.test(input) && !hnode(state, hdfsPath); }
   };
 }
@@ -205,6 +256,12 @@ function stepJavac() {
     hints: ['javac needs -classpath <hadoop’s jars> and the .java file. On Linux/Mac you can splice the classpath in with "$(hadoop classpath)".',
       'Shape: javac -classpath "$(hadoop classpath)" -d . MatrixMultiplication.java'],
     answer: javacCmd,
+    anatomy: function (os) {
+      return [['javac', 'the Java compiler'],
+        [os === 'windows' ? '-classpath "%HADOOP_HOME%\\...\\*"' : '-classpath "$(hadoop classpath)"', 'let it see Hadoop\u2019s libraries while compiling'],
+        ['-d .', 'drop the .class files right here'],
+        ['MatrixMultiplication.java', 'your source file']];
+    },
     check: function (state) { return state.compiled; }
   };
 }
@@ -215,6 +272,12 @@ function stepJar() {
     question: 'Package the compiled classes into MatrixMultiplication.jar.',
     hints: ['The jar tool with -cf <name.jar> <what to include>.', 'Shape: jar -cf MatrixMultiplication.jar *.class'],
     answer: jarCmd,
+    anatomy: function (os) {
+      return [['jar', 'the packager'],
+        [os === 'windows' ? '-cvf' : '-cf', 'Create a File (v = list what goes in)'],
+        ['MatrixMultiplication.jar', 'the output jar name'],
+        [os === 'windows' ? '-C . .' : '*.class', 'what to pack: the compiled classes']];
+    },
     check: function (state) { return state.jarBuilt; }
   };
 }
@@ -226,6 +289,13 @@ function stepRunJob(inPath, outPath) {
     hints: ['hadoop jar, then the jar file, then the main class name (MatrixMultiplication), then input path, then output path.',
       'Shape: hadoop jar MatrixMultiplication.jar MatrixMultiplication ' + inPath + ' ' + outPath],
     answer: function () { return 'hadoop jar MatrixMultiplication.jar MatrixMultiplication ' + inPath + ' ' + outPath; },
+    anatomy: function () {
+      return [['hadoop jar', 'run a MapReduce program from a jar'],
+        ['MatrixMultiplication.jar', 'which jar'],
+        ['MatrixMultiplication', 'the main class inside it'],
+        [inPath, 'input: your data in HDFS'],
+        [outPath, 'output dir \u2014 must NOT exist yet']];
+    },
     check: function (state) { return !!hnode(state, outPath + '/part-r-00000'); }
   };
 }
@@ -236,6 +306,10 @@ function stepReadResult(outPath) {
     question: 'Read the job result from ' + outPath + '.',
     hints: ['It is just -cat on the part file.', 'Shape: hadoop fs -cat ' + outPath + '/part-r-00000'],
     answer: function () { return 'hadoop fs -cat ' + outPath + '/part-r-00000'; },
+    anatomy: function () {
+      return [['hadoop fs -cat', 'print a file from HDFS'],
+        [outPath + '/part-r-00000', 'the reducer\u2019s output file (r = reducer, 00000 = first one)']];
+    },
     check: function (state, result, input) {
       return result.ok && input.indexOf('-cat') !== -1 && result.output.indexOf('19') !== -1 && result.output.indexOf('50') !== -1;
     }
@@ -348,6 +422,9 @@ function stepCp(src, dst) {
     question: 'Copy ' + src + ' to ' + dst + ' (both in HDFS).',
     hints: ['Same shape as Unix cp, as an fs subcommand.', 'Shape: hadoop fs -cp ' + src + ' ' + dst],
     answer: function () { return 'hadoop fs -cp ' + src + ' ' + dst; },
+    anatomy: function () {
+      return [['hadoop fs', 'talk to HDFS'], ['-cp', 'copy inside HDFS (original stays)'], [src, 'source'], [dst, 'destination']];
+    },
     check: function (state) { return !!hnode(state, dst) && !!hnode(state, src); }
   };
 }
@@ -358,6 +435,9 @@ function stepMv(src, dst) {
     question: 'Rename ' + src + ' to ' + dst + '.',
     hints: ['Move and rename are one command.', 'Shape: hadoop fs -mv ' + src + ' ' + dst],
     answer: function () { return 'hadoop fs -mv ' + src + ' ' + dst; },
+    anatomy: function () {
+      return [['hadoop fs', 'talk to HDFS'], ['-mv', 'move OR rename (one command for both)'], [src, 'what to move'], [dst, 'new place / new name']];
+    },
     check: function (state) { return !!hnode(state, dst) && !hnode(state, src); }
   };
 }
@@ -368,6 +448,9 @@ function stepTouchz(path) {
     question: 'Create an empty file at ' + path + '.',
     hints: ['Like Unix touch, with a z.', 'Shape: hadoop fs -touchz ' + path],
     answer: function () { return 'hadoop fs -touchz ' + path; },
+    anatomy: function () {
+      return [['hadoop fs', 'talk to HDFS'], ['-touchz', 'create an empty file (z = zero bytes)'], [path, 'where to create it']];
+    },
     check: function (state) { var n = hnode(state, path); return !!n && n.type === 'file'; }
   };
 }
@@ -378,6 +461,9 @@ function stepCount(path) {
     question: 'Count the directories, files and bytes under ' + path + '.',
     hints: ['One fs subcommand, one path.', 'Shape: hadoop fs -count ' + path],
     answer: function () { return 'hadoop fs -count ' + path; },
+    anatomy: function () {
+      return [['hadoop fs', 'talk to HDFS'], ['-count', 'one summary line: dirs, files, bytes'], [path, 'what to summarise']];
+    },
     check: function (state, result, input) { return result.ok && input.indexOf('-count') !== -1; }
   };
 }
@@ -388,6 +474,9 @@ function stepDu(path) {
     question: 'Show the human-readable size of everything in ' + path + '.',
     hints: ['du plus the human flag plus the path.', 'Shape: hadoop fs -du -h ' + path],
     answer: function () { return 'hadoop fs -du -h ' + path; },
+    anatomy: function () {
+      return [['hadoop fs', 'talk to HDFS'], ['-du', 'disk usage per entry'], ['-h', 'human-readable sizes (K / M / G)'], [path, 'which directory']];
+    },
     check: function (state, result, input) { return result.ok && input.indexOf('-du') !== -1; }
   };
 }
@@ -398,6 +487,9 @@ function stepTail(path, fragment) {
     question: 'Show the tail end of ' + path + '.',
     hints: ['Like Unix tail.', 'Shape: hadoop fs -tail ' + path],
     answer: function () { return 'hadoop fs -tail ' + path; },
+    anatomy: function () {
+      return [['hadoop fs', 'talk to HDFS'], ['-tail', 'print only the last 1 KB'], [path, 'the (possibly huge) file']];
+    },
     check: function (state, result, input) { return result.ok && input.indexOf('-tail') !== -1 && result.output.indexOf(fragment) !== -1; }
   };
 }
@@ -408,6 +500,9 @@ function stepReport() {
     question: 'Print the cluster health report.',
     hints: ['It is a dfsadmin subcommand, not fs.', 'Shape: hdfs dfsadmin -report'],
     answer: function () { return 'hdfs dfsadmin -report'; },
+    anatomy: function () {
+      return [['hdfs dfsadmin', 'the ADMIN side of HDFS (not fs)'], ['-report', 'capacity, usage and every live DataNode']];
+    },
     check: function (state, result, input) { return result.ok && input.indexOf('dfsadmin') !== -1 && input.indexOf('-report') !== -1; }
   };
 }
@@ -418,6 +513,9 @@ function stepVersion() {
     question: 'Print which Hadoop version you are running.',
     hints: ['Plain hadoop subcommand, no dash.', 'Shape: hadoop version'],
     answer: function () { return 'hadoop version'; },
+    anatomy: function () {
+      return [['hadoop', 'the hadoop launcher'], ['version', 'print the installed version (no dash!)']];
+    },
     check: function (state, result, input) { return result.ok && /^hadoop\s+version$/.test(input.trim()); }
   };
 }
@@ -428,6 +526,8 @@ function stripTheory(step) {
   var s = {};
   for (var k in step) s[k] = step[k];
   delete s.theory;
+  delete s.anatomy;
+  delete s.note;
   return s;
 }
 
